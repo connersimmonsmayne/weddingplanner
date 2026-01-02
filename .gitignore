@@ -4,24 +4,24 @@
 *.swo
 *~
 
-# Personal wedding planning files (keep only app/)
-attire/
-budget/
-ceremony/
-decor/
-events/
-exports/
-guests/
-honeymoon/
-legal/
-logistics/
-reception/
-registry/
-scripts/
-stationery/
-vendors/
-venue/
-GRETA_README.md
+# Personal wedding planning files (root level only)
+/attire/
+/budget/
+/ceremony/
+/decor/
+/events/
+/exports/
+/guests/
+/honeymoon/
+/legal/
+/logistics/
+/reception/
+/registry/
+/scripts/
+/stationery/
+/vendors/
+/venue/
+/GRETA_README.md
 
 # Python
 __pycache__/
