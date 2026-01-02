@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,71 +12,56 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 
-export default function JoinPage() {
-  const [inviteCode, setInviteCode] = useState('')
+function JoinPageContent() {
+  const searchParams = useSearchParams()
+  const codeFromUrl = searchParams.get('code')
+
+  const [inviteCode, setInviteCode] = useState(codeFromUrl?.toUpperCase() || '')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasAccount, setHasAccount] = useState(false)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
+  const [autoJoining, setAutoJoining] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    // First, authenticate the user
-    let userId: string | undefined
-
-    if (hasAccount) {
-      // Sign in existing user
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (error) {
-        toast.error(error.message)
-        setLoading(false)
-        return
+  // Handle auto-join when user returns from email confirmation
+  useEffect(() => {
+    const checkSessionAndAutoJoin = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      // If user is authenticated and has a code in URL, attempt auto-join
+      if (session?.user && codeFromUrl) {
+        setAutoJoining(true)
+        await joinWedding(session.user.id, codeFromUrl.toUpperCase())
       }
-      userId = data.user?.id
-    } else {
-      // Sign up new user
-      if (password.length < 6) {
-        toast.error('Password must be at least 6 characters')
-        setLoading(false)
-        return
-      }
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-      if (error) {
-        toast.error(error.message)
-        setLoading(false)
-        return
-      }
-      userId = data.user?.id
     }
 
-    if (!userId) {
-      toast.error('Failed to authenticate')
-      setLoading(false)
-      return
-    }
+    checkSessionAndAutoJoin()
+  }, [codeFromUrl])
 
+  // Update invite code if URL param changes
+  useEffect(() => {
+    if (codeFromUrl) {
+      setInviteCode(codeFromUrl.toUpperCase())
+    }
+  }, [codeFromUrl])
+
+  const joinWedding = async (userId: string, code: string) => {
     // Find wedding by invite code
     const { data: wedding, error: weddingError } = await supabase
       .from('weddings')
       .select('id, name')
-      .eq('invite_code', inviteCode.toUpperCase())
+      .eq('invite_code', code)
       .single()
 
     if (weddingError || !wedding) {
       toast.error('Invalid invite code')
+      setAutoJoining(false)
       setLoading(false)
-      return
+      return false
     }
 
     // Check if already a member
@@ -88,9 +74,8 @@ export default function JoinPage() {
 
     if (existingMember) {
       toast.info('You are already a member of this wedding!')
-      router.push('/select')
-      router.refresh()
-      return
+      await redirectBasedOnWeddingCount(userId, wedding.id)
+      return true
     }
 
     // Add user as member
@@ -105,13 +90,128 @@ export default function JoinPage() {
 
     if (memberError) {
       toast.error('Failed to join wedding')
+      setAutoJoining(false)
       setLoading(false)
-      return
+      return false
     }
 
     toast.success(`Welcome to ${wedding.name}!`)
-    router.push('/select')
+    await redirectBasedOnWeddingCount(userId, wedding.id)
+    return true
+  }
+
+  const redirectBasedOnWeddingCount = async (userId: string, joinedWeddingId: string) => {
+    // Count how many weddings the user is part of
+    const { data: memberships } = await supabase
+      .from('wedding_members')
+      .select('wedding_id')
+      .eq('user_id', userId)
+
+    if (memberships && memberships.length === 1) {
+      // Only one wedding - go directly to dashboard
+      router.push(`/dashboard?wedding=${joinedWeddingId}`)
+    } else {
+      // Multiple weddings - go to selector
+      router.push('/select')
+    }
     router.refresh()
+  }
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    let userId: string | undefined
+
+    if (hasAccount) {
+      // Sign in existing user
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) {
+        toast.error(error.message)
+        setLoading(false)
+        return
+      }
+      userId = data.user?.id
+
+      if (!userId) {
+        toast.error('Failed to authenticate')
+        setLoading(false)
+        return
+      }
+
+      // Existing user - join immediately
+      await joinWedding(userId, inviteCode)
+    } else {
+      // Sign up new user
+      if (password.length < 6) {
+        toast.error('Password must be at least 6 characters')
+        setLoading(false)
+        return
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/join?code=${inviteCode}`,
+        },
+      })
+
+      if (error) {
+        toast.error(error.message)
+        setLoading(false)
+        return
+      }
+
+      // New user needs email confirmation - show message
+      setLoading(false)
+      setAwaitingConfirmation(true)
+    }
+  }
+
+  // Show loading state while auto-joining
+  if (autoJoining) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-8 text-center">
+            <div className="animate-pulse text-muted-foreground">Joining wedding...</div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show confirmation message after new signup
+  if (awaitingConfirmation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Check Your Email</CardTitle>
+            <CardDescription>
+              We&apos;ve sent a confirmation link to <strong>{email}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center text-sm text-muted-foreground space-y-2">
+            <p>Click the link in the email to confirm your account.</p>
+            <p>Once confirmed, you&apos;ll be automatically added to the wedding.</p>
+            <p className="mt-4">Didn&apos;t receive it? Check your spam folder.</p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Button variant="outline" className="w-full" onClick={() => setAwaitingConfirmation(false)}>
+              Try a different email
+            </Button>
+            <Link href="/login" className="text-sm text-muted-foreground hover:underline">
+              Already have an account? Sign in
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -119,7 +219,12 @@ export default function JoinPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Join a Wedding</CardTitle>
-          <CardDescription>Enter your invite code to join a wedding plan</CardDescription>
+          <CardDescription>
+            {codeFromUrl 
+              ? "You've been invited! Create an account or sign in to join."
+              : "Enter your invite code to join a wedding plan"
+            }
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleJoin}>
           <CardContent className="space-y-4">
@@ -134,6 +239,11 @@ export default function JoinPage() {
                 className="uppercase tracking-widest text-center font-mono"
                 required
               />
+              {codeFromUrl && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Pre-filled from your invite link
+                </p>
+              )}
             </div>
 
             <Tabs value={hasAccount ? 'signin' : 'signup'} onValueChange={(v) => setHasAccount(v === 'signin')}>
@@ -215,5 +325,21 @@ export default function JoinPage() {
         </form>
       </Card>
     </div>
+  )
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-8 text-center">
+            <div className="animate-pulse text-muted-foreground">Loading...</div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <JoinPageContent />
+    </Suspense>
   )
 }

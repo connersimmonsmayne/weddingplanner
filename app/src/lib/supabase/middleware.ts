@@ -40,7 +40,7 @@ export async function updateSession(request: NextRequest) {
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
   
   // Auth routes - redirect to app if already logged in
-  const authPaths = ['/login', '/signup', '/join']
+  const authPaths = ['/login', '/signup', '/join', '/reset-password']
   const isAuthPath = authPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
   if (isProtectedPath && !user) {

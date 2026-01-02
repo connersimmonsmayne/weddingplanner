@@ -113,10 +113,11 @@ export default function SettingsPage() {
     setSaving(false)
   }
 
-  const handleCopyInviteCode = () => {
+  const handleCopyInviteLink = () => {
     if (wedding?.invite_code) {
-      navigator.clipboard.writeText(wedding.invite_code)
-      toast.success('Invite code copied!')
+      const inviteUrl = `${window.location.origin}/join?code=${wedding.invite_code}`
+      navigator.clipboard.writeText(inviteUrl)
+      toast.success('Invite link copied!')
     }
   }
 
@@ -269,13 +270,13 @@ export default function SettingsPage() {
             <div className="flex-1 p-4 rounded-lg bg-muted font-mono text-2xl text-center tracking-widest">
               {wedding.invite_code}
             </div>
-            <Button onClick={handleCopyInviteCode} variant="outline">
+            <Button onClick={handleCopyInviteLink} variant="outline">
               <Copy className="h-4 w-4 mr-2" />
-              Copy
+              Copy Link
             </Button>
           </div>
           <p className="text-sm text-muted-foreground mt-3">
-            Your partner can join at <span className="font-mono">/join</span> using this code
+            Share this link with your partner to give them access
           </p>
         </CardContent>
       </Card>
