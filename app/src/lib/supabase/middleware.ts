@@ -40,7 +40,8 @@ export async function updateSession(request: NextRequest) {
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
   
   // Auth routes - redirect to app if already logged in
-  const authPaths = ['/login', '/signup', '/join', '/reset-password']
+  // Note: /join is NOT included here because authenticated users need to access it to join weddings via invite link
+  const authPaths = ['/login', '/signup', '/reset-password']
   const isAuthPath = authPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
   if (isProtectedPath && !user) {
