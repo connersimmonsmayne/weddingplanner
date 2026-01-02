@@ -70,9 +70,7 @@ export default function SettingsPage() {
     const fetchMembers = async () => {
       setLoading(true)
       const { data, error } = await supabase
-        .from('wedding_members')
-        .select('*')
-        .eq('wedding_id', wedding.id)
+        .rpc('get_wedding_members', { p_wedding_id: wedding.id })
 
       if (error) {
         toast.error('Failed to load members')
