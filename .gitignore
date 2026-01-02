@@ -1,0 +1,43 @@
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Personal wedding planning files (keep only app/)
+attire/
+budget/
+ceremony/
+decor/
+events/
+exports/
+guests/
+honeymoon/
+legal/
+logistics/
+reception/
+registry/
+scripts/
+stationery/
+vendors/
+venue/
+AGENTS.md
+GRETA_README.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.env
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
