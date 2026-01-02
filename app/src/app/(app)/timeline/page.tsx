@@ -31,14 +31,14 @@ import {
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Calendar, Clock, CheckCircle2, Circle } from 'lucide-react'
 
-const OWNERS = ['Conner', 'Greta', 'Both'] as const
+const OWNERS = ['partner1', 'partner2', 'both'] as const
 const PRIORITIES = ['high', 'medium', 'low'] as const
 
 type TaskFormState = {
   title: string
   description: string
   category: string
-  owner: 'Conner' | 'Greta' | 'Both'
+  owner: 'partner1' | 'partner2' | 'both'
   due_date: string
   priority: 'high' | 'medium' | 'low'
 }
@@ -63,7 +63,7 @@ export default function TimelinePage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null)
   const [taskForm, setTaskForm] = useState<TaskFormState>({
-    title: '', description: '', category: '', owner: 'Both', 
+    title: '', description: '', category: '', owner: 'both', 
     due_date: '', priority: 'medium'
   })
   const [eventForm, setEventForm] = useState<EventFormState>({
@@ -106,7 +106,7 @@ export default function TimelinePage() {
       })
     } else {
       setEditingTask(null)
-      setTaskForm({ title: '', description: '', category: '', owner: 'Both', due_date: '', priority: 'medium' })
+      setTaskForm({ title: '', description: '', category: '', owner: 'both', due_date: '', priority: 'medium' })
     }
     setTaskDialogOpen(true)
   }

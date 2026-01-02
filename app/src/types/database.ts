@@ -241,7 +241,7 @@ export interface Database {
           category: string | null
           title: string
           description: string | null
-          owner: 'Conner' | 'Greta' | 'Both'
+          owner: 'partner1' | 'partner2' | 'both'
           due_date: string | null
           status: 'pending' | 'in_progress' | 'completed'
           priority: 'high' | 'medium' | 'low'
