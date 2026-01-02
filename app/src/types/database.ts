@@ -153,6 +153,7 @@ export interface Database {
         Row: {
           id: string
           category_id: string
+          wedding_id: string
           description: string | null
           amount: number
           vendor: string | null
@@ -163,6 +164,7 @@ export interface Database {
         Insert: {
           id?: string
           category_id: string
+          wedding_id: string
           description?: string | null
           amount: number
           vendor?: string | null
@@ -173,6 +175,7 @@ export interface Database {
         Update: {
           id?: string
           category_id?: string
+          wedding_id?: string
           description?: string | null
           amount?: number
           vendor?: string | null
@@ -241,7 +244,7 @@ export interface Database {
           category: string | null
           title: string
           description: string | null
-          owner: 'partner1' | 'partner2' | 'both'
+          owner: string
           due_date: string | null
           status: 'pending' | 'in_progress' | 'completed'
           priority: 'high' | 'medium' | 'low'
@@ -254,7 +257,7 @@ export interface Database {
           category?: string | null
           title: string
           description?: string | null
-          owner?: 'Conner' | 'Greta' | 'Both'
+          owner?: string
           due_date?: string | null
           status?: 'pending' | 'in_progress' | 'completed'
           priority?: 'high' | 'medium' | 'low'
@@ -267,7 +270,7 @@ export interface Database {
           category?: string | null
           title?: string
           description?: string | null
-          owner?: 'Conner' | 'Greta' | 'Both'
+          owner?: string
           due_date?: string | null
           status?: 'pending' | 'in_progress' | 'completed'
           priority?: 'high' | 'medium' | 'low'

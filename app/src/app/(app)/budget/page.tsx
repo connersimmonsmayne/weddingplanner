@@ -213,7 +213,7 @@ export default function BudgetPage() {
   }
 
   const handleSaveExpense = async () => {
-    if (!selectedCategory || !expenseForm.amount) {
+    if (!wedding?.id || !selectedCategory || !expenseForm.amount) {
       toast.error('Amount is required')
       return
     }
@@ -225,6 +225,7 @@ export default function BudgetPage() {
       .from('budget_expenses')
       .insert({
         category_id: selectedCategory.id,
+        wedding_id: wedding.id,
         description: expenseForm.description || null,
         amount,
         vendor: expenseForm.vendor || null,

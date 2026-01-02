@@ -38,7 +38,7 @@ type TaskFormState = {
   title: string
   description: string
   category: string
-  owner: 'partner1' | 'partner2' | 'both'
+  owner: string
   due_date: string
   priority: 'high' | 'medium' | 'low'
 }
