@@ -21,7 +21,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -32,8 +32,27 @@ export default function LoginPage() {
       return
     }
 
+    if (!authData.user) {
+      toast.error('Failed to sign in')
+      setLoading(false)
+      return
+    }
+
+    // Check how many weddings the user belongs to
+    const { data: memberships } = await supabase
+      .from('wedding_members')
+      .select('wedding_id')
+      .eq('user_id', authData.user.id)
+
     toast.success('Logged in successfully!')
-    router.push('/select')
+
+    if (memberships && memberships.length === 1) {
+      // Single wedding - go directly to dashboard
+      router.push(`/dashboard?wedding=${memberships[0].wedding_id}`)
+    } else {
+      // No weddings or multiple weddings - go to selector
+      router.push('/select')
+    }
     router.refresh()
   }
 

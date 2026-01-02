@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const supabase = createClient()
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -36,6 +36,9 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/select`,
+      },
     })
 
     if (error) {
@@ -44,9 +47,35 @@ export default function SignupPage() {
       return
     }
 
-    toast.success('Account created! Please check your email to confirm.')
-    router.push('/select')
-    router.refresh()
+    setLoading(false)
+    setAwaitingConfirmation(true)
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Check Your Email</CardTitle>
+            <CardDescription>
+              We&apos;ve sent a confirmation link to <strong>{email}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center text-sm text-muted-foreground space-y-2">
+            <p>Click the link in the email to confirm your account.</p>
+            <p className="mt-4">Didn&apos;t receive it? Check your spam folder.</p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Button variant="outline" className="w-full" onClick={() => setAwaitingConfirmation(false)}>
+              Try a different email
+            </Button>
+            <Link href="/login" className="text-sm text-muted-foreground hover:underline">
+              Already have an account? Sign in
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
+    )
   }
 
   return (
