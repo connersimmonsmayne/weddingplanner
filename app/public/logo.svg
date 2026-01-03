@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Left ring -->
+  <ellipse cx="38" cy="50" rx="22" ry="24" stroke="url(#gold1)" stroke-width="5" fill="none"/>
+  <!-- Right ring -->
+  <ellipse cx="62" cy="50" rx="22" ry="24" stroke="url(#gold2)" stroke-width="5" fill="none"/>
+  <!-- Diamond -->
+  <path d="M38 18 L44 26 L38 34 L32 26 Z" stroke="#666" stroke-width="1.5" fill="none"/>
+  <path d="M32 26 L44 26" stroke="#666" stroke-width="1"/>
+  <path d="M38 18 L38 26" stroke="#666" stroke-width="0.5"/>
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="gold1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4A84B"/>
+      <stop offset="50%" style="stop-color:#F5D998"/>
+      <stop offset="100%" style="stop-color:#C9963C"/>
+    </linearGradient>
+    <linearGradient id="gold2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4A84B"/>
+      <stop offset="50%" style="stop-color:#F5D998"/>
+      <stop offset="100%" style="stop-color:#C9963C"/>
+    </linearGradient>
+  </defs>
+</svg>

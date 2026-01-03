@@ -2,11 +2,12 @@ import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { WeddingProvider } from '@/components/providers/wedding-provider'
-import { Navigation } from '@/components/layout/navigation'
+import { Sidebar } from '@/components/layout/sidebar'
+import { MobileNav } from '@/components/layout/mobile-nav'
 
 async function getWeddingData(weddingId: string, userId: string) {
   const supabase = await createClient()
-  
+
   // Get membership
   const { data: membership } = await supabase
     .from('wedding_members')
@@ -41,16 +42,25 @@ export default async function AppLayout({
 
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-warm">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     }>
       <WeddingProvider>
-        <div className="min-h-screen bg-background">
-          <Navigation />
-          <main className="max-w-7xl mx-auto px-4 py-6">
-            {children}
-          </main>
+        <div className="min-h-screen bg-gradient-warm flex">
+          {/* Desktop Sidebar */}
+          <Sidebar />
+
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Mobile Navigation */}
+            <MobileNav />
+
+            {/* Page Content */}
+            <main className="flex-1 p-4 md:p-6 lg:p-8">
+              {children}
+            </main>
+          </div>
         </div>
       </WeddingProvider>
     </Suspense>
