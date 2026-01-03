@@ -587,14 +587,14 @@ export default function VendorsPage() {
                     <div className="space-y-2">
                       <Label htmlFor="rating">Rating</Label>
                       <Select
-                        value={formData.rating?.toString() || ''}
-                        onValueChange={(value) => setFormData({ ...formData, rating: value ? parseInt(value) : null })}
+                        value={formData.rating?.toString() || 'none'}
+                        onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Rate" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No rating</SelectItem>
+                          <SelectItem value="none">No rating</SelectItem>
                           {[1, 2, 3, 4, 5].map((r) => (
                             <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
                           ))}
