@@ -96,14 +96,14 @@ export default function DashboardPage() {
 
       {/* Activity Feed + Weekly Tasks */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="animate-fade-in-up animate-stagger-3">
+        <div className="animate-fade-in-up animate-stagger-3 overflow-hidden min-w-0">
           <ActivityFeed
             key={`activity-${refreshKey}`}
             weddingId={wedding.id}
             userDisplayName={membership?.display_name || 'System'}
           />
         </div>
-        <div className="animate-fade-in-up animate-stagger-4">
+        <div className="animate-fade-in-up animate-stagger-4 overflow-hidden min-w-0">
           <WeeklyTasks key={`tasks-${refreshKey}`} weddingId={wedding.id} />
         </div>
       </div>

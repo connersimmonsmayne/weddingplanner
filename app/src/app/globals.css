@@ -179,10 +179,16 @@
   }
   html,
   body {
-    @apply overflow-x-hidden;
+    @apply overflow-x-hidden m-0 p-0;
+    min-height: 100%;
+  }
+  html {
+    height: 100%;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+    min-height: 100%;
   }
 }
 
