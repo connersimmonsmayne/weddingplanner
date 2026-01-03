@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Flag, Check, Circle, Loader2 } from 'lucide-react'
+import { Flag, Check, Circle, Clock } from 'lucide-react'
 
 interface MilestoneData {
   venue: 'complete' | 'in_progress' | 'not_started'
@@ -138,7 +138,7 @@ export function MilestoneTimeline({ weddingId, weddingDate }: MilestoneTimelineP
       case 'complete':
         return <Check className="h-4 w-4" />
       case 'in_progress':
-        return <Loader2 className="h-4 w-4 animate-spin" />
+        return <Clock className="h-4 w-4" />
       default:
         return <Circle className="h-4 w-4" />
     }
