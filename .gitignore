@@ -38,5 +38,8 @@ ENV/
 .vscode/
 *.sublime-*
 
+# MCP config (contains secrets)
+.mcp.json
+
 # Logs
 *.log
