@@ -55,3 +55,34 @@ const { wedding } = useWedding()
 - **Icons**: `import { Icon } from 'lucide-react'`
 - **Utilities**: `cn()` from `@/lib/utils`
 - **Types**: `import { Wedding, Guest } from '@/types/database'`
+
+## Feature Development Workflow
+
+Always use feature branches with Vercel previews before merging to main.
+
+### Branch Naming
+- `feature/` - new features (e.g., `feature/guest-import`)
+- `fix/` - bug fixes (e.g., `fix/responsive-layout`)
+
+### Workflow
+
+1. **Create branch from main**
+   ```bash
+   git checkout main && git pull
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make changes and commit**
+   ```bash
+   git add . && git commit -m "Description of changes"
+   ```
+
+3. **Push and create PR**
+   ```bash
+   git push -u origin feature/your-feature-name
+   gh pr create --title "Feature title" --body "Description"
+   ```
+
+4. **Test on Vercel preview** - PR triggers automatic preview deployment
+
+5. **Merge when ready** - Use GitHub UI or `gh pr merge`
