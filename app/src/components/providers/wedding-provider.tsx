@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Wedding, WeddingMember } from '@/types/database'
@@ -41,11 +41,11 @@ export function WeddingProvider({
   const [loading, setLoading] = useState(!initialWedding)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const weddingId = searchParams.get('wedding')
 
-  const fetchWedding = async () => {
+  const fetchWedding = useCallback(async () => {
     if (!weddingId) {
       router.push('/select')
       return
@@ -87,17 +87,17 @@ export function WeddingProvider({
     setMembership(membershipData)
     setWedding(weddingData)
     setLoading(false)
-  }
+  }, [weddingId, router, supabase])
 
   useEffect(() => {
     if (!initialWedding && weddingId) {
       fetchWedding()
     }
-  }, [weddingId])
+  }, [initialWedding, weddingId, fetchWedding])
 
-  const refreshWedding = async () => {
+  const refreshWedding = useCallback(async () => {
     await fetchWedding()
-  }
+  }, [fetchWedding])
 
   return (
     <WeddingContext.Provider value={{
