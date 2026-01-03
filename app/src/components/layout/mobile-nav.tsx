@@ -13,7 +13,7 @@ import {
   Wallet,
   Store,
   Calendar,
-  PartyPopper,
+  Map,
   Settings,
   Menu,
   X,
@@ -24,11 +24,11 @@ import {
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/plan', label: 'Plan', icon: Map },
   { href: '/guests', label: 'Guests', icon: Users },
   { href: '/budget', label: 'Budget', icon: Wallet },
   { href: '/vendors', label: 'Vendors', icon: Store },
   { href: '/timeline', label: 'Timeline', icon: Calendar },
-  { href: '/events', label: 'Events', icon: PartyPopper },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

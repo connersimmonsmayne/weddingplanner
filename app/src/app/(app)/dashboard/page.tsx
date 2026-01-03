@@ -4,7 +4,7 @@ import { useWedding } from '@/components/providers/wedding-provider'
 import { QuickActions } from '@/components/dashboard/quick-actions'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { WeeklyTasks } from '@/components/dashboard/weekly-tasks'
-import { MilestoneTimeline } from '@/components/dashboard/milestone-timeline'
+import { NextMilestone } from '@/components/dashboard/next-milestone'
 import { VendorStatus } from '@/components/dashboard/vendor-status'
 import { useState, useCallback } from 'react'
 
@@ -84,9 +84,9 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Planning Milestone Timeline */}
+      {/* Next Milestone */}
       <div className="animate-fade-in-up animate-stagger-1">
-        <MilestoneTimeline weddingId={wedding.id} weddingDate={wedding.wedding_date} />
+        <NextMilestone weddingId={wedding.id} weddingDate={wedding.wedding_date} />
       </div>
 
       {/* Quick Actions */}
