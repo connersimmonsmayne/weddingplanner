@@ -89,7 +89,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "hidden md:flex flex-col h-screen bg-sidebar shadow-sidebar sticky top-0 transition-all duration-300 ease-in-out",
+        "hidden md:flex flex-col h-screen shadow-sidebar sticky top-0 transition-all duration-300 ease-in-out",
+        "bg-gradient-to-b from-sidebar via-sidebar to-[color-mix(in_oklch,var(--sidebar)_97%,var(--primary)_3%)]",
         isCollapsed ? "w-[72px]" : "w-[260px]"
       )}
     >
