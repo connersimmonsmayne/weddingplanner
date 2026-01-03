@@ -61,7 +61,7 @@ export function Navigation() {
         </div>
 
         {/* Mobile navigation */}
-        <div className="md:hidden flex overflow-x-auto gap-1 pb-3 -mx-4 px-4">
+        <div className="md:hidden flex overflow-x-auto gap-1 pb-3">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname.startsWith(item.href)

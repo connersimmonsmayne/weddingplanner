@@ -197,17 +197,17 @@ export function MilestoneTimeline({ weddingId, weddingDate }: MilestoneTimelineP
           </div>
         ) : (
           <div className="relative">
-            {/* Progress line */}
-            <div className="absolute top-5 left-5 right-5 h-0.5 bg-muted" />
+            {/* Progress line - hidden on mobile grid layout */}
+            <div className="absolute top-5 left-5 right-5 h-0.5 bg-muted hidden sm:block" />
             <div
-              className="absolute top-5 left-5 h-0.5 bg-primary transition-all duration-500"
+              className="absolute top-5 left-5 h-0.5 bg-primary transition-all duration-500 hidden sm:block"
               style={{
                 width: `${Math.max(0, (milestoneItems.filter(m => m.status === 'complete').length / milestoneItems.length) * 100 - 10)}%`
               }}
             />
 
-            {/* Milestones */}
-            <div className="relative flex justify-between">
+            {/* Milestones - grid on mobile, flex row on larger screens */}
+            <div className="relative grid grid-cols-2 gap-4 sm:flex sm:justify-between">
               {milestoneItems.map((item, index) => (
                 <div key={item.label} className="flex flex-col items-center">
                   <div
