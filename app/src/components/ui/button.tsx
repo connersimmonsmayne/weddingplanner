@@ -13,11 +13,11 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-white shadow-sm hover:bg-destructive/90 hover:shadow-md hover:-translate-y-px active:translate-y-0 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
-          "border bg-card shadow-sm hover:bg-accent hover:text-accent-foreground hover:shadow-md hover:-translate-y-px active:translate-y-0 dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "border bg-card shadow-sm hover:bg-accent hover:text-accent-foreground hover:shadow-md hover:-translate-y-px active:translate-y-0 dark:bg-input/30 dark:border-input dark:hover:bg-input/50 dark:hover:text-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:-translate-y-px active:translate-y-0",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 dark:hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         // New pill variant - fully rounded primary button
         pill: "bg-primary text-primary-foreground rounded-full shadow-sm hover:bg-primary/90 hover:shadow-md hover:-translate-y-px active:translate-y-0",
