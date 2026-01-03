@@ -54,39 +54,64 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Greeting Header */}
-      <div>
+    <div className="space-y-6 bg-refined min-h-full">
+      {/* Hero Greeting with Elegant Countdown */}
+      <div className="animate-fade-in-up">
         <h1 className="text-2xl font-semibold tracking-tight">
           {getGreeting()}, {userName || 'there'}
         </h1>
-        <p className="text-muted-foreground">
-          {daysUntilWedding !== null && daysUntilWedding > 0 && (
-            <>There {daysUntilWedding === 1 ? 'is' : 'are'} {daysUntilWedding} day{daysUntilWedding !== 1 ? 's' : ''} until the {wedding.name}</>
-          )}
-          {daysUntilWedding !== null && daysUntilWedding === 0 && "It's your wedding day!"}
-          {daysUntilWedding === null && <>{wedding.partner1_name} & {wedding.partner2_name}</>}
-        </p>
+
+        {/* Elegant Countdown Display */}
+        {daysUntilWedding !== null && daysUntilWedding > 0 && (
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className="font-display text-5xl md:text-6xl text-primary font-medium">
+              {daysUntilWedding}
+            </span>
+            <span className="text-sm uppercase tracking-elegant text-muted-foreground">
+              {daysUntilWedding === 1 ? 'day' : 'days'} until your wedding
+            </span>
+          </div>
+        )}
+        {daysUntilWedding !== null && daysUntilWedding === 0 && (
+          <p className="mt-2 font-display text-3xl text-primary">
+            It&apos;s your wedding day!
+          </p>
+        )}
+        {daysUntilWedding === null && (
+          <p className="text-muted-foreground mt-1">
+            {wedding.partner1_name} & {wedding.partner2_name}
+          </p>
+        )}
       </div>
 
       {/* Planning Milestone Timeline */}
-      <MilestoneTimeline weddingId={wedding.id} weddingDate={wedding.wedding_date} />
+      <div className="animate-fade-in-up animate-stagger-1">
+        <MilestoneTimeline weddingId={wedding.id} weddingDate={wedding.wedding_date} />
+      </div>
 
       {/* Quick Actions */}
-      <QuickActions weddingId={wedding.id} onActionComplete={handleActionComplete} />
+      <div className="animate-fade-in-up animate-stagger-2">
+        <QuickActions weddingId={wedding.id} onActionComplete={handleActionComplete} />
+      </div>
 
       {/* Activity Feed + Weekly Tasks */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <ActivityFeed
-          key={`activity-${refreshKey}`}
-          weddingId={wedding.id}
-          userDisplayName={membership?.display_name || 'System'}
-        />
-        <WeeklyTasks key={`tasks-${refreshKey}`} weddingId={wedding.id} />
+        <div className="animate-fade-in-up animate-stagger-3">
+          <ActivityFeed
+            key={`activity-${refreshKey}`}
+            weddingId={wedding.id}
+            userDisplayName={membership?.display_name || 'System'}
+          />
+        </div>
+        <div className="animate-fade-in-up animate-stagger-4">
+          <WeeklyTasks key={`tasks-${refreshKey}`} weddingId={wedding.id} />
+        </div>
       </div>
 
       {/* Vendor Status Cards */}
-      <VendorStatus weddingId={wedding.id} />
+      <div className="animate-fade-in-up animate-stagger-5">
+        <VendorStatus weddingId={wedding.id} />
+      </div>
     </div>
   )
 }
