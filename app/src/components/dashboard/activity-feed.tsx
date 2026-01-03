@@ -221,7 +221,7 @@ export function ActivityFeed({ weddingId, userDisplayName = 'System' }: Activity
             <p className="text-xs text-muted-foreground mt-1">Activity from the last 7 days will appear here</p>
           </div>
         ) : (
-          <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+          <div className="space-y-4 max-h-[280px] sm:max-h-[400px] overflow-y-auto pr-2">
             {Object.entries(groupedActivities).map(([day, items]) => (
               <div key={day}>
                 <p className="text-xs font-medium text-muted-foreground mb-2">{day}</p>
@@ -229,20 +229,22 @@ export function ActivityFeed({ weddingId, userDisplayName = 'System' }: Activity
                   {items.map((activity) => (
                     <div
                       key={activity.id}
-                      className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                      className="flex items-start gap-2 sm:gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
-                      <div className="mt-0.5">{getActivityIcon(activity.type)}</div>
+                      <div className="mt-0.5 flex-shrink-0">{getActivityIcon(activity.type)}</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{activity.title}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="text-sm font-medium truncate">{activity.title}</p>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            {formatTime(activity.timestamp)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
                           {activity.description}
                           <span className="mx-1">·</span>
                           <span className="italic">by {activity.performedBy}</span>
                         </p>
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatTime(activity.timestamp)}
-                      </span>
                     </div>
                   ))}
                 </div>
