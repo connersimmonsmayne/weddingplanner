@@ -1,6 +1,10 @@
 # AGENTS.md
 
-Instructions for AI coding agents working in this repository.
+Comprehensive reference for AI coding agents. This is the authoritative source for code style, patterns, and conventions.
+
+For a quick reference, see [CLAUDE.md](./CLAUDE.md).
+
+---
 
 ## Project Overview
 
@@ -38,9 +42,9 @@ weddingplanner/
 └── AGENTS.md
 ```
 
-## Build/Lint/Test Commands
+## Commands
 
-All commands run from `app/` directory:
+All commands run from the `app/` directory:
 
 ```bash
 # Development
