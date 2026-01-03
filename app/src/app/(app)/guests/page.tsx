@@ -331,10 +331,10 @@ export default function GuestsPage() {
       />
 
       {/* Main Content - List + Detail Layout */}
-      <div className="flex-1 flex gap-6 min-h-0">
+      <div className="flex-1 flex gap-6 min-h-0 overflow-hidden min-w-0">
         {/* Guest List Panel */}
         <div className={cn(
-          "flex flex-col min-h-0",
+          "flex flex-col min-h-0 overflow-hidden min-w-0",
           showDetailPanel ? "hidden lg:flex lg:w-[360px]" : "flex-1"
         )}>
           {/* Search & Filters */}
@@ -397,7 +397,7 @@ export default function GuestsPage() {
                       key={guest.id}
                       onClick={() => handleSelectGuest(guest)}
                       className={cn(
-                        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors",
+                        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
                         selectedGuest?.id === guest.id && "bg-primary/5"
                       )}
                     >
@@ -433,7 +433,7 @@ export default function GuestsPage() {
 
         {/* Detail Panel */}
         {showDetailPanel && (
-          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden min-w-0">
             {/* Detail Header */}
             <CardHeader className="flex-shrink-0 border-b">
               <div className="flex items-center justify-between">
@@ -473,7 +473,7 @@ export default function GuestsPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="group">Group</Label>
                       <Input
@@ -494,7 +494,7 @@ export default function GuestsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="priority">Priority</Label>
                       <Select
