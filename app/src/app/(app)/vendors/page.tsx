@@ -241,7 +241,7 @@ export default function VendorsPage() {
     if (isCreating) {
       const { data, error } = await supabase
         .from('vendors')
-        .insert({ ...vendorData, wedding_id: wedding.id })
+        .insert({ ...vendorData, id: crypto.randomUUID(), wedding_id: wedding.id })
         .select()
         .single()
 
