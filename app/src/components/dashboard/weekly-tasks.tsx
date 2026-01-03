@@ -166,7 +166,7 @@ export function WeeklyTasks({ weddingId }: WeeklyTasksProps) {
                     <div
                       key={task.id}
                       className={cn(
-                        "flex items-center gap-2 sm:gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group",
+                        "flex items-center gap-2 sm:gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group min-w-0",
                         day === 'Overdue' && "bg-destructive/5"
                       )}
                     >
