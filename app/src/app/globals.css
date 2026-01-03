@@ -56,8 +56,8 @@
 }
 
 :root {
-  /* Base radius - increased for modern look */
-  --radius: 0.75rem;
+  /* Base radius - refined for clean, polished look */
+  --radius: 0.625rem;
 
   /* Gradient background (subtle white to off-white) */
   --gradient-start: #ffffff;
