@@ -60,9 +60,25 @@ const { wedding } = useWedding()
 
 Always use feature branches with Vercel previews before merging to main.
 
-### Branch Naming
-- `feature/` - new features (e.g., `feature/guest-import`)
-- `fix/` - bug fixes (e.g., `fix/responsive-layout`)
+### Branch Naming Convention
+
+Choose the prefix based on the type of change:
+
+| Prefix | When to Use | Examples |
+|--------|-------------|----------|
+| `feature/` | Adding new functionality or capabilities | `feature/guest-export`, `feature/email-notifications` |
+| `fix/` | Fixing bugs, errors, or broken behavior | `fix/task-null-id`, `fix/login-redirect` |
+| `refactor/` | Improving code without changing behavior (includes responsive/layout fixes) | `refactor/guests-responsive`, `refactor/extract-utils` |
+| `style/` | Pure visual/CSS changes (colors, spacing, fonts) | `style/dark-mode-colors`, `style/button-hover` |
+| `chore/` | Maintenance, dependencies, config, docs | `chore/update-deps`, `chore/eslint-config` |
+| `hotfix/` | Urgent production fixes | `hotfix/auth-crash` |
+
+**Quick Decision Guide:**
+- "It doesn't work" → `fix/`
+- "It works but looks wrong" → `style/`
+- "It works but code is messy / not responsive" → `refactor/`
+- "Add something new" → `feature/`
+- "Update packages / config" → `chore/`
 
 ### Workflow
 
