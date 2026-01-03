@@ -235,7 +235,7 @@ export function ActivityFeed({ weddingId, userDisplayName = 'System' }: Activity
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline justify-between gap-2">
                           <p className="text-sm font-medium truncate">{activity.title}</p>
-                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                          <span className="text-xs text-muted-foreground flex-shrink-0 hidden sm:inline">
                             {formatTime(activity.timestamp)}
                           </span>
                         </div>
