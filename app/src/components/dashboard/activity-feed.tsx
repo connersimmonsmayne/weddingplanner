@@ -202,7 +202,7 @@ export function ActivityFeed({ weddingId, userDisplayName = 'System' }: Activity
   }, {} as Record<string, ActivityItem[]>)
 
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-primary" />
@@ -221,7 +221,7 @@ export function ActivityFeed({ weddingId, userDisplayName = 'System' }: Activity
             <p className="text-xs text-muted-foreground mt-1">Activity from the last 7 days will appear here</p>
           </div>
         ) : (
-          <div className="space-y-4 max-h-[280px] sm:max-h-[400px] overflow-y-auto pr-2">
+          <div className="space-y-4">
             {Object.entries(groupedActivities).map(([day, items]) => (
               <div key={day}>
                 <p className="text-xs font-medium text-muted-foreground mb-2">{day}</p>

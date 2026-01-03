@@ -123,7 +123,7 @@ export function WeeklyTasks({ weddingId }: WeeklyTasksProps) {
   const groupedTasks = groupTasksByDay()
 
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-primary" />
@@ -147,7 +147,7 @@ export function WeeklyTasks({ weddingId }: WeeklyTasksProps) {
             <p className="text-xs text-muted-foreground mt-1">You're all caught up!</p>
           </div>
         ) : (
-          <div className="space-y-4 max-h-[280px] sm:max-h-[400px] overflow-y-auto pr-2">
+          <div className="space-y-4">
             {Object.entries(groupedTasks).map(([day, dayTasks]) => (
               <div key={day}>
                 <div className="flex items-center gap-2 mb-2">
