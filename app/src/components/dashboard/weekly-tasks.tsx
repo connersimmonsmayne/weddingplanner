@@ -123,7 +123,7 @@ export function WeeklyTasks({ weddingId }: WeeklyTasksProps) {
   const groupedTasks = groupTasksByDay()
 
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-primary" />
@@ -147,7 +147,7 @@ export function WeeklyTasks({ weddingId }: WeeklyTasksProps) {
             <p className="text-xs text-muted-foreground mt-1">You're all caught up!</p>
           </div>
         ) : (
-          <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+          <div className="space-y-4">
             {Object.entries(groupedTasks).map(([day, dayTasks]) => (
               <div key={day}>
                 <div className="flex items-center gap-2 mb-2">
@@ -166,23 +166,23 @@ export function WeeklyTasks({ weddingId }: WeeklyTasksProps) {
                     <div
                       key={task.id}
                       className={cn(
-                        "flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group",
+                        "flex items-center gap-2 sm:gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group",
                         day === 'Overdue' && "bg-destructive/5"
                       )}
                     >
                       <Checkbox
                         checked={task.status === 'completed'}
                         onCheckedChange={() => handleToggleTask(task)}
-                        className="data-[state=checked]:bg-primary"
+                        className="data-[state=checked]:bg-primary flex-shrink-0"
                       />
                       <span className={cn(
-                        "text-sm flex-1",
+                        "text-sm flex-1 min-w-0 truncate",
                         task.status === 'completed' && "line-through text-muted-foreground"
                       )}>
                         {task.title}
                       </span>
                       {task.due_date && day !== 'Overdue' && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground flex-shrink-0 hidden sm:inline">
                           {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                       )}
