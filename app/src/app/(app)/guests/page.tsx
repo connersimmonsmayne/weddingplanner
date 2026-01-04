@@ -891,6 +891,17 @@ export default function GuestsPage() {
                             disabled={!newPartnerName.trim()}
                             onClick={async () => {
                               if (!wedding?.id || !newPartnerName.trim()) return
+
+                              // Check for duplicate name
+                              const existingGuest = guests.find(
+                                g => g.name.toLowerCase() === newPartnerName.trim().toLowerCase()
+                              )
+                              if (existingGuest) {
+                                if (!confirm(`A guest named "${newPartnerName.trim()}" already exists. Create anyway?`)) {
+                                  return
+                                }
+                              }
+
                               // Create new partner guest
                               const { data: newPartner, error } = await supabase
                                 .from('guests')
@@ -945,18 +956,18 @@ export default function GuestsPage() {
                             <SelectValue placeholder="Select partner (optional)" />
                           </SelectTrigger>
                           <SelectContent>
-                            {selectedGuest?.id && getPartnerOptions(selectedGuest.id, formData.name).map((adult) => (
-                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
-                            ))}
-                            {!selectedGuest?.id && getPartnerOptions('', formData.name).map((adult) => (
-                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
-                            ))}
                             <SelectItem value="__add_new__" className="text-primary">
                               <span className="flex items-center gap-2">
                                 <Plus className="h-4 w-4" />
                                 Add new partner
                               </span>
                             </SelectItem>
+                            {selectedGuest?.id && getPartnerOptions(selectedGuest.id, formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
+                            {!selectedGuest?.id && getPartnerOptions('', formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       )}
