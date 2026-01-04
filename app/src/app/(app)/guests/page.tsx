@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, Fragment } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
 import { Guest } from '@/types/database'
@@ -34,6 +34,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -1017,137 +1023,290 @@ export default function GuestsPage() {
                   </TableHeader>
                   <TableBody>
                     {groupByFamily ? (
-                      /* Grouped Table View */
-                      groupedByFamily.map(({ family, members, key }) => (
-                        <React.Fragment key={key}>
-                          {/* Family header row - only show if more than 1 member */}
-                          {members.length > 1 && (
+                      /* Grouped Table View - Families first, then singles */
+                      <>
+                        {/* Families (2+ members) */}
+                        {groupedByFamily.filter(g => g.members.length > 1).map(({ family, members, key }) => (
+                          <React.Fragment key={key}>
                             <TableRow className="bg-muted/80 hover:bg-muted/80">
                               <TableCell colSpan={8} className="py-2">
                                 <span className="font-semibold text-sm">{family}</span>
                                 <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
                               </TableCell>
                             </TableRow>
-                          )}
-                          {/* Family members */}
-                          {members.map((guest) => (
-                            <TableRow
-                              key={guest.id}
-                              className={cn(
-                                "cursor-pointer",
-                                selectedGuest?.id === guest.id && "bg-primary/5",
-                                members.length > 1 && "border-l-2 border-l-primary/30 bg-muted/30"
-                              )}
-                              onClick={() => handleSelectGuest(guest)}
-                            >
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={selectedIds.has(guest.id)}
-                                  onCheckedChange={() => toggleSelection(guest.id)}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div className={cn(
-                                  "w-2 h-2 rounded-full",
-                                  getPriorityColor(guest.priority)
-                                )} />
-                              </TableCell>
-                              <TableCell>
-                                <div className={cn("flex items-center gap-2", guest.is_child && "pl-6")}>
-                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                    <span className="text-xs font-medium text-primary">
-                                      {getInitials(guest.name)}
-                                    </span>
+                            {members.map((guest) => (
+                              <TableRow
+                                key={guest.id}
+                                className={cn(
+                                  "cursor-pointer border-l-2 border-l-primary/30 bg-muted/30",
+                                  selectedGuest?.id === guest.id && "bg-primary/5"
+                                )}
+                                onClick={() => handleSelectGuest(guest)}
+                              >
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedIds.has(guest.id)}
+                                    onCheckedChange={() => toggleSelection(guest.id)}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <div className={cn(
+                                    "w-2 h-2 rounded-full",
+                                    getPriorityColor(guest.priority)
+                                  )} />
+                                </TableCell>
+                                <TableCell>
+                                  <div className={cn("flex items-center gap-2", guest.is_child && "pl-6")}>
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-medium text-primary">
+                                        {getInitials(guest.name)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium">{guest.name}</span>
+                                      {guest.is_child && (
+                                        <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-medium">{guest.name}</span>
-                                    {guest.is_child && (
-                                      <Baby className="h-3.5 w-3.5 text-muted-foreground" />
-                                    )}
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button className="focus:outline-none text-muted-foreground hover:text-foreground">
-                                      {guest.group_name || 'Set side'}
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="start">
-                                    {sideOptions.map((option) => (
-                                      <DropdownMenuItem
-                                        key={option.value}
-                                        onClick={() => handleQuickSide(guest, option.value)}
-                                      >
-                                        {option.label}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {guest.relationship || '-'}
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-sm">{guest.priority || '-'}</span>
-                              </TableCell>
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button className="focus:outline-none">
-                                      <Badge
-                                        variant={getRsvpBadgeVariant(guest.rsvp_status)}
-                                        className="capitalize cursor-pointer hover:opacity-80"
-                                      >
-                                        {guest.rsvp_status}
-                                      </Badge>
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {RSVP_OPTIONS.map((status) => (
-                                      <DropdownMenuItem
-                                        key={status}
-                                        onClick={() => handleQuickRsvp(guest, status)}
-                                        className="capitalize"
-                                      >
-                                        {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
-                                        {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
-                                        {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
-                                        {status}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5">
-                                  {guest.dietary_restrictions && (
-                                    <span title="Has dietary restrictions">
-                                      <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
-                                    </span>
-                                  )}
-                                  {guest.address && (
-                                    <span title="Address on file">
-                                      <MapPin className="h-3.5 w-3.5 text-blue-500" />
-                                    </span>
-                                  )}
-                                  {guest.partner_id && (
-                                    <span title="Has partner linked">
-                                      <Heart className="h-3.5 w-3.5 text-pink-500" />
-                                    </span>
-                                  )}
-                                  {guest.plus_one && (
-                                    <span title="Has plus one">
-                                      <UserPlus className="h-3.5 w-3.5 text-purple-500" />
-                                    </span>
-                                  )}
-                                </div>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="focus:outline-none text-muted-foreground hover:text-foreground">
+                                        {guest.group_name || 'Set side'}
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                      {sideOptions.map((option) => (
+                                        <DropdownMenuItem
+                                          key={option.value}
+                                          onClick={() => handleQuickSide(guest, option.value)}
+                                        >
+                                          {option.label}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {guest.relationship || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-sm">{guest.priority || '-'}</span>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="focus:outline-none">
+                                        <Badge
+                                          variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                          className="capitalize cursor-pointer hover:opacity-80"
+                                        >
+                                          {guest.rsvp_status}
+                                        </Badge>
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {RSVP_OPTIONS.map((status) => (
+                                        <DropdownMenuItem
+                                          key={status}
+                                          onClick={() => handleQuickRsvp(guest, status)}
+                                          className="capitalize"
+                                        >
+                                          {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                          {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                          {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                          {status}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                                <TableCell>
+                                  <TooltipProvider>
+                                    <div className="flex items-center gap-1.5">
+                                      {guest.dietary_restrictions && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                          </TooltipTrigger>
+                                          <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {guest.address && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                          </TooltipTrigger>
+                                          <TooltipContent><p>Address on file</p></TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {guest.partner_id && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                          </TooltipTrigger>
+                                          <TooltipContent><p>Partner linked</p></TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {guest.plus_one && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                          </TooltipTrigger>
+                                          <TooltipContent><p>Has plus one</p></TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                    </div>
+                                  </TooltipProvider>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </React.Fragment>
+                        ))}
+
+                        {/* Singles section with header */}
+                        {groupedByFamily.filter(g => g.members.length === 1).length > 0 && (
+                          <>
+                            <TableRow className="bg-muted/80 hover:bg-muted/80">
+                              <TableCell colSpan={8} className="py-2">
+                                <span className="font-semibold text-sm">Individual Guests</span>
+                                <span className="text-muted-foreground text-sm ml-2">
+                                  ({groupedByFamily.filter(g => g.members.length === 1).length})
+                                </span>
                               </TableCell>
                             </TableRow>
-                          ))}
-                        </React.Fragment>
-                      ))
+                            {groupedByFamily.filter(g => g.members.length === 1).map(({ members, key }) => {
+                              const guest = members[0]
+                              return (
+                                <TableRow
+                                  key={key}
+                                  className={cn(
+                                    "cursor-pointer",
+                                    selectedGuest?.id === guest.id && "bg-primary/5"
+                                  )}
+                                  onClick={() => handleSelectGuest(guest)}
+                                >
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={selectedIds.has(guest.id)}
+                                      onCheckedChange={() => toggleSelection(guest.id)}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className={cn(
+                                      "w-2 h-2 rounded-full",
+                                      getPriorityColor(guest.priority)
+                                    )} />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-xs font-medium text-primary">
+                                          {getInitials(guest.name)}
+                                        </span>
+                                      </div>
+                                      <span className="font-medium">{guest.name}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button className="focus:outline-none text-muted-foreground hover:text-foreground">
+                                          {guest.group_name || 'Set side'}
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="start">
+                                        {sideOptions.map((option) => (
+                                          <DropdownMenuItem
+                                            key={option.value}
+                                            onClick={() => handleQuickSide(guest, option.value)}
+                                          >
+                                            {option.label}
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {guest.relationship || '-'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-sm">{guest.priority || '-'}</span>
+                                  </TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button className="focus:outline-none">
+                                          <Badge
+                                            variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                            className="capitalize cursor-pointer hover:opacity-80"
+                                          >
+                                            {guest.rsvp_status}
+                                          </Badge>
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        {RSVP_OPTIONS.map((status) => (
+                                          <DropdownMenuItem
+                                            key={status}
+                                            onClick={() => handleQuickRsvp(guest, status)}
+                                            className="capitalize"
+                                          >
+                                            {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                            {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                            {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                            {status}
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                  <TableCell>
+                                    <TooltipProvider>
+                                      <div className="flex items-center gap-1.5">
+                                        {guest.dietary_restrictions && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        {guest.address && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Address on file</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        {guest.partner_id && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Partner linked</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        {guest.plus_one && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Has plus one</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                      </div>
+                                    </TooltipProvider>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </>
+                        )}
+                      </>
                     ) : (
                       /* Flat Table View */
                       sortedGuests.map((guest) => (
@@ -1240,28 +1399,42 @@ export default function GuestsPage() {
                             </DropdownMenu>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              {guest.dietary_restrictions && (
-                                <span title="Has dietary restrictions">
-                                  <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
-                                </span>
-                              )}
-                              {guest.address && (
-                                <span title="Address on file">
-                                  <MapPin className="h-3.5 w-3.5 text-blue-500" />
-                                </span>
-                              )}
-                              {guest.partner_id && (
-                                <span title="Has partner linked">
-                                  <Heart className="h-3.5 w-3.5 text-pink-500" />
-                                </span>
-                              )}
-                              {guest.plus_one && (
-                                <span title="Has plus one">
-                                  <UserPlus className="h-3.5 w-3.5 text-purple-500" />
-                                </span>
-                              )}
-                            </div>
+                            <TooltipProvider>
+                              <div className="flex items-center gap-1.5">
+                                {guest.dietary_restrictions && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {guest.address && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Address on file</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {guest.partner_id && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Partner linked</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {guest.plus_one && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Has plus one</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            </TooltipProvider>
                           </TableCell>
                         </TableRow>
                       ))
@@ -1269,19 +1442,16 @@ export default function GuestsPage() {
                   </TableBody>
                 </Table>
               ) : groupByFamily ? (
-                /* Grouped by Family View */
+                /* Grouped by Family View - Families first, then singles */
                 <div>
-                  {groupedByFamily.map(({ family, members, key }) => (
+                  {/* Families (2+ members) */}
+                  {groupedByFamily.filter(g => g.members.length > 1).map(({ family, members, key }) => (
                     <div key={key}>
-                      {/* Family Header - only show if more than 1 member */}
-                      {members.length > 1 && (
-                        <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
-                          <span className="font-semibold text-sm">{family}</span>
-                          <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
-                        </div>
-                      )}
-                      {/* Family Members */}
-                      <div className="divide-y">
+                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
+                        <span className="font-semibold text-sm">{family}</span>
+                        <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                      </div>
+                      <div className="divide-y border-l-2 border-l-primary/30 bg-muted/30">
                         {members.map((guest) => (
                           <div
                             key={guest.id}
@@ -1291,23 +1461,19 @@ export default function GuestsPage() {
                               guest.is_child && "pl-8"
                             )}
                           >
-                            {/* Checkbox */}
                             <Checkbox
                               checked={selectedIds.has(guest.id)}
                               onCheckedChange={() => toggleSelection(guest.id)}
                               className="flex-shrink-0"
                             />
-                            {/* Clickable area for guest selection */}
                             <button
                               onClick={() => handleSelectGuest(guest)}
                               className="flex items-center gap-3 flex-1 min-w-0 text-left"
                             >
-                              {/* Priority dot */}
                               <div className={cn(
                                 "w-2 h-2 rounded-full flex-shrink-0",
                                 getPriorityColor(guest.priority)
-                              )} title={guest.priority || 'No priority'} />
-
+                              )} />
                               <div className={cn(
                                 "flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center",
                                 guest.is_child ? "w-8 h-8" : "w-10 h-10"
@@ -1330,33 +1496,43 @@ export default function GuestsPage() {
                                   {guest.relationship || guest.group_name || 'No info'}
                                 </div>
                               </div>
-
-                              {/* Indicator icons */}
-                              <div className="flex items-center gap-1.5 flex-shrink-0">
-                                {guest.dietary_restrictions && (
-                                  <span title="Has dietary restrictions">
-                                    <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
-                                  </span>
-                                )}
-                                {guest.address && (
-                                  <span title="Address on file">
-                                    <MapPin className="h-3.5 w-3.5 text-blue-500" />
-                                  </span>
-                                )}
-                                {guest.partner_id && (
-                                  <span title="Has partner linked">
-                                    <Heart className="h-3.5 w-3.5 text-pink-500" />
-                                  </span>
-                                )}
-                                {guest.plus_one && (
-                                  <span title="Has plus one">
-                                    <UserPlus className="h-3.5 w-3.5 text-purple-500" />
-                                  </span>
-                                )}
-                              </div>
+                              <TooltipProvider>
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  {guest.dietary_restrictions && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {guest.address && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Address on file</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {guest.partner_id && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Partner linked</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {guest.plus_one && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Has plus one</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                              </TooltipProvider>
                             </button>
-
-                            {/* Inline RSVP Dropdown */}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button className="focus:outline-none">
@@ -1388,6 +1564,120 @@ export default function GuestsPage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Singles section with header */}
+                  {groupedByFamily.filter(g => g.members.length === 1).length > 0 && (
+                    <div>
+                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
+                        <span className="font-semibold text-sm">Individual Guests</span>
+                        <span className="text-muted-foreground text-sm ml-2">
+                          ({groupedByFamily.filter(g => g.members.length === 1).length})
+                        </span>
+                      </div>
+                      <div className="divide-y">
+                        {groupedByFamily.filter(g => g.members.length === 1).map(({ members, key }) => {
+                          const guest = members[0]
+                          return (
+                            <div
+                              key={key}
+                              className={cn(
+                                "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors min-w-0",
+                                selectedGuest?.id === guest.id && "bg-primary/5"
+                              )}
+                            >
+                              <Checkbox
+                                checked={selectedIds.has(guest.id)}
+                                onCheckedChange={() => toggleSelection(guest.id)}
+                                className="flex-shrink-0"
+                              />
+                              <button
+                                onClick={() => handleSelectGuest(guest)}
+                                className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                              >
+                                <div className={cn(
+                                  "w-2 h-2 rounded-full flex-shrink-0",
+                                  getPriorityColor(guest.priority)
+                                )} />
+                                <div className="flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center w-10 h-10">
+                                  <span className="font-medium text-primary text-sm">
+                                    {getInitials(guest.name)}
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{guest.name}</div>
+                                  <div className="text-sm text-muted-foreground truncate">
+                                    {guest.relationship || guest.group_name || 'No info'}
+                                  </div>
+                                </div>
+                                <TooltipProvider>
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {guest.dietary_restrictions && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {guest.address && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Address on file</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {guest.partner_id && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Partner linked</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {guest.plus_one && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Has plus one</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                </TooltipProvider>
+                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="focus:outline-none">
+                                    <Badge
+                                      variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                      className="capitalize flex-shrink-0 cursor-pointer hover:opacity-80"
+                                    >
+                                      {guest.rsvp_status}
+                                    </Badge>
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {RSVP_OPTIONS.map((status) => (
+                                    <DropdownMenuItem
+                                      key={status}
+                                      onClick={() => handleQuickRsvp(guest, status)}
+                                      className="capitalize"
+                                    >
+                                      {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                      {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                      {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                      {status}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Flat List View */
