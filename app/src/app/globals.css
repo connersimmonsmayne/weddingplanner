@@ -59,64 +59,64 @@
   /* Base radius - refined for clean, polished look */
   --radius: 0.625rem;
 
-  /* Gradient background (subtle white to off-white) */
-  --gradient-start: #ffffff;
-  --gradient-end: #f9f9f7;
+  /* Gradient background - dark with subtle warmth */
+  --gradient-start: #0a0a0b;
+  --gradient-end: #0f0f10;
 
-  /* Background - clean white */
-  --background: #ffffff;
-  --foreground: #231F20; /* dark grey */
+  /* Background - near black (Obsidian Gold theme) */
+  --background: #0a0a0b;
+  --foreground: #fafafa;
 
-  /* Cards - pure white with subtle shadow */
-  --card: #ffffff;
-  --card-foreground: #231F20;
-  --card-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  /* Cards - slightly lighter than background */
+  --card: #141415;
+  --card-foreground: #fafafa;
+  --card-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
 
   /* Popovers */
-  --popover: #ffffff;
-  --popover-foreground: #231F20;
+  --popover: #141415;
+  --popover-foreground: #fafafa;
 
-  /* Primary - elegant gold #AD974F */
-  --primary: #AD974F;
-  --primary-foreground: #ffffff;
+  /* Primary - warm gold */
+  --primary: #d4a574;
+  --primary-foreground: #0a0a0b;
 
-  /* Secondary - light gold tint */
-  --secondary: #f5f0e6;
-  --secondary-foreground: #8E793E;
+  /* Secondary - muted gold tint on dark */
+  --secondary: #1a1918;
+  --secondary-foreground: #d4a574;
 
-  /* Muted - light grey #EAEAEA */
-  --muted: #EAEAEA;
-  --muted-foreground: #5c5c5c;
+  /* Muted - dark zinc */
+  --muted: #27272a;
+  --muted-foreground: #71717a;
 
-  /* Accent - dark grey #231F20 */
-  --accent: #231F20;
-  --accent-foreground: #ffffff;
+  /* Accent - muted bronze */
+  --accent: #8b7355;
+  --accent-foreground: #fafafa;
 
   /* Destructive - red */
-  --destructive: #dc2626;
+  --destructive: #ef4444;
 
-  /* Borders - light grey */
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #AD974F;
+  /* Borders - subtle white */
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #d4a574;
 
   /* Chart colors - gold palette */
-  --chart-1: #AD974F;
-  --chart-2: #8E793E;
-  --chart-3: #6b5a2f;
-  --chart-4: #c4b06a;
-  --chart-5: #231F20;
+  --chart-1: #d4a574;
+  --chart-2: #8b7355;
+  --chart-3: #a08060;
+  --chart-4: #e8c9a8;
+  --chart-5: #fafafa;
 
-  /* Sidebar - white with shadow */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #231F20;
-  --sidebar-primary: #AD974F;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5f0e6;
-  --sidebar-accent-foreground: #8E793E;
-  --sidebar-border: #EAEAEA;
-  --sidebar-ring: #AD974F;
-  --sidebar-shadow: 4px 0 15px -3px rgba(0, 0, 0, 0.05);
+  /* Sidebar - dark with gold accents */
+  --sidebar: #0f0f10;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #d4a574;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #1a1918;
+  --sidebar-accent-foreground: #d4a574;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #d4a574;
+  --sidebar-shadow: 4px 0 15px -3px rgba(0, 0, 0, 0.5);
 
   /* Sidebar dimensions */
   --sidebar-width: 260px;
@@ -124,53 +124,53 @@
 }
 
 .dark {
-  /* Dark mode - elegant dark grey with gold accents */
-  --gradient-start: #231F20;
-  --gradient-end: #1a1718;
+  /* Dark mode - mirrors root (app is dark-first) */
+  --gradient-start: #0a0a0b;
+  --gradient-end: #0f0f10;
 
-  --background: #231F20; /* dark grey */
-  --foreground: #f5f5f5;
+  --background: #0a0a0b;
+  --foreground: #fafafa;
 
-  --card: #2d2829;
-  --card-foreground: #f5f5f5;
-  --card-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --card: #141415;
+  --card-foreground: #fafafa;
+  --card-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
 
-  --popover: #2d2829;
-  --popover-foreground: #f5f5f5;
+  --popover: #141415;
+  --popover-foreground: #fafafa;
 
-  --primary: #c4a95c; /* Brighter gold for dark mode */
-  --primary-foreground: #231F20;
+  --primary: #d4a574;
+  --primary-foreground: #0a0a0b;
 
-  --secondary: #3d3536;
-  --secondary-foreground: #c4a95c;
+  --secondary: #1a1918;
+  --secondary-foreground: #d4a574;
 
-  --muted: #3d3536;
-  --muted-foreground: #a0a0a0;
+  --muted: #27272a;
+  --muted-foreground: #71717a;
 
-  --accent: #EAEAEA; /* Light grey accent in dark mode */
-  --accent-foreground: #231F20;
+  --accent: #8b7355;
+  --accent-foreground: #fafafa;
 
   --destructive: #ef4444;
 
-  --border: rgba(255, 255, 255, 0.12);
-  --input: rgba(255, 255, 255, 0.12);
-  --ring: #c4a95c;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #d4a574;
 
-  --chart-1: #c4a95c;
-  --chart-2: #AD974F;
-  --chart-3: #8E793E;
-  --chart-4: #d4bc6a;
-  --chart-5: #EAEAEA;
+  --chart-1: #d4a574;
+  --chart-2: #8b7355;
+  --chart-3: #a08060;
+  --chart-4: #e8c9a8;
+  --chart-5: #fafafa;
 
-  --sidebar: #1a1718;
-  --sidebar-foreground: #f5f5f5;
-  --sidebar-primary: #c4a95c;
-  --sidebar-primary-foreground: #231F20;
-  --sidebar-accent: #3d3536;
-  --sidebar-accent-foreground: #c4a95c;
-  --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: #c4a95c;
-  --sidebar-shadow: 4px 0 15px -3px rgba(0, 0, 0, 0.3);
+  --sidebar: #0f0f10;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #d4a574;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #1a1918;
+  --sidebar-accent-foreground: #d4a574;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #d4a574;
+  --sidebar-shadow: 4px 0 15px -3px rgba(0, 0, 0, 0.5);
 }
 
 @layer base {
@@ -255,17 +255,11 @@
    REFINED ELEGANCE - Background & Depth
    ============================================ */
 
-/* Subtle warm gradient background */
+/* Subtle warm gradient background - gold accents */
 .bg-refined {
   background:
-    radial-gradient(ellipse at top right, rgba(173, 151, 79, 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom left, rgba(173, 151, 79, 0.02) 0%, transparent 50%);
-}
-
-.dark .bg-refined {
-  background:
-    radial-gradient(ellipse at top right, rgba(196, 169, 92, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom left, rgba(196, 169, 92, 0.02) 0%, transparent 50%);
+    radial-gradient(ellipse at top right, rgba(212, 165, 116, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom left, rgba(212, 165, 116, 0.02) 0%, transparent 50%);
 }
 
 /* ============================================
@@ -293,10 +287,6 @@
 
 .hover-lift:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
-}
-
-.dark .hover-lift:hover {
   box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.3);
 }
 
@@ -306,9 +296,123 @@
 }
 
 .hover-card-lift:hover {
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
-.dark .hover-card-lift:hover {
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+/* ============================================
+   LANDING PAGE - Utility Classes
+   ============================================ */
+
+/* Gold gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #d4a574 0%, #e8c9a8 50%, #d4a574 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Custom selection color */
+::selection {
+  background: rgba(212, 165, 116, 0.3);
+  color: #fafafa;
+}
+
+/* Ambient glow pulse animation */
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Fade up animation - more pronounced for landing */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.8s ease-out forwards;
+}
+
+/* Scroll animation base state */
+.animate-on-scroll {
+  opacity: 0;
+}
+
+.animate-on-scroll.visible {
+  animation: fadeUp 0.8s ease-out forwards;
+}
+
+/* Button shine effect */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.btn-shine:hover::after {
+  left: 100%;
+}
+
+/* Card hover with gold glow */
+.card-hover-gold {
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+.card-hover-gold:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(212, 165, 116, 0.1);
+}
+
+/* Noise texture overlay */
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.03;
+  z-index: 100;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-glow-pulse,
+  .animate-on-scroll.visible,
+  .btn-shine::after {
+    animation: none;
+    transition: none;
+  }
+
+  .animate-on-scroll {
+    opacity: 1;
+  }
 }
