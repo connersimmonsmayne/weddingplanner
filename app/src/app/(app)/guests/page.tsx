@@ -31,6 +31,7 @@ import {
   Search,
   Users,
   Upload,
+  Download,
   X,
   Mail,
   MapPin,
@@ -548,6 +549,76 @@ export default function GuestsPage() {
     }
   }
 
+  const handleExport = () => {
+    // CSV escape function - wraps in quotes and escapes internal quotes
+    const escapeCSV = (value: string | null | undefined): string => {
+      if (value === null || value === undefined) return ''
+      const str = String(value)
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
+    // Helper to get guest name by ID
+    const getGuestName = (id: string | null): string => {
+      if (!id) return ''
+      const guest = guests.find(g => g.id === id)
+      return guest?.name || ''
+    }
+
+    // CSV header
+    const headers = [
+      'Name',
+      'Side',
+      'Relationship',
+      'Priority',
+      'RSVP Status',
+      'Dietary Restrictions',
+      'Address',
+      'Plus One',
+      'Notes',
+      'Is Child',
+      'Partner',
+      'Parent'
+    ]
+
+    // CSV rows
+    const rows = guests.map(guest => [
+      escapeCSV(guest.name),
+      escapeCSV(guest.group_name),
+      escapeCSV(guest.relationship),
+      escapeCSV(guest.priority),
+      escapeCSV(guest.rsvp_status),
+      escapeCSV(guest.dietary_restrictions),
+      escapeCSV(guest.address),
+      escapeCSV(guest.plus_one),
+      escapeCSV(guest.notes),
+      guest.is_child ? 'Yes' : 'No',
+      escapeCSV(getGuestName(guest.partner_id)),
+      escapeCSV(getGuestName(guest.parent_id))
+    ])
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n')
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${wedding?.name || 'guests'}-guest-list.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast.success(`Exported ${guests.length} guests to CSV`)
+  }
+
   if (weddingLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -600,6 +671,10 @@ export default function GuestsPage() {
         count={stats.total}
         countLabel={`guests • ${stats.confirmed} confirmed • ${stats.pending} pending`}
       >
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="h-4 w-4" />
+          <span className="hidden sm:inline ml-2">Export</span>
+        </Button>
         <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)}>
           <Upload className="h-4 w-4" />
           <span className="hidden sm:inline ml-2">Import</span>
