@@ -52,6 +52,7 @@ interface GuestFormData {
   rsvp_status: 'pending' | 'confirmed' | 'declined'
   dietary_restrictions: string
   is_child: boolean
+  parent_id: string
 }
 
 const emptyFormData: GuestFormData = {
@@ -65,6 +66,7 @@ const emptyFormData: GuestFormData = {
   rsvp_status: 'pending',
   dietary_restrictions: '',
   is_child: false,
+  parent_id: '',
 }
 
 function getInitials(name: string): string {
@@ -133,6 +135,23 @@ export default function GuestsPage() {
 
   const uniqueRelationships = [...new Set(guests.map(g => g.relationship).filter(Boolean))]
 
+  // Get adult guests for parent dropdown, sorted by same last name first
+  const getParentOptions = (currentGuestName: string) => {
+    const adults = guests.filter(g => !g.is_child)
+    const currentLastName = getLastName(currentGuestName)
+
+    return adults.sort((a, b) => {
+      const aLastName = getLastName(a.name)
+      const bLastName = getLastName(b.name)
+      const aMatch = aLastName === currentLastName
+      const bMatch = bLastName === currentLastName
+
+      if (aMatch && !bMatch) return -1
+      if (!aMatch && bMatch) return 1
+      return a.name.localeCompare(b.name)
+    })
+  }
+
   const sideOptions = wedding ? [
     { value: `${wedding.partner1_name.split(' ')[0]}'s Side`, label: `${wedding.partner1_name}'s Side` },
     { value: `${wedding.partner2_name.split(' ')[0]}'s Side`, label: `${wedding.partner2_name}'s Side` },
@@ -166,18 +185,119 @@ export default function GuestsPage() {
   }, [filteredGuests, sortBy])
 
   const groupedByFamily = useMemo(() => {
-    const groups: Record<string, Guest[]> = {}
+    // Build parent-to-children mapping
+    const parentToChildren: Record<string, Guest[]> = {}
+    const adultsWithKids = new Set<string>()
+
     sortedGuests.forEach(guest => {
-      const lastName = getLastName(guest.name)
-      if (!groups[lastName]) groups[lastName] = []
-      groups[lastName].push(guest)
+      if (guest.is_child && guest.parent_id) {
+        if (!parentToChildren[guest.parent_id]) {
+          parentToChildren[guest.parent_id] = []
+        }
+        parentToChildren[guest.parent_id].push(guest)
+        adultsWithKids.add(guest.parent_id)
+      }
     })
-    return Object.entries(groups)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([family, members]) => ({
-        family,
-        members // Keep the sorted order from sortedGuests
-      }))
+
+    // Find all unique parent pairs (by checking which adults share the same kids)
+    const familyGroups: Record<string, { parents: Guest[], kids: Guest[] }> = {}
+    const processedAdults = new Set<string>()
+
+    // Group adults that share children
+    sortedGuests.forEach(guest => {
+      if (guest.is_child || processedAdults.has(guest.id)) return
+
+      const myKids = parentToChildren[guest.id] || []
+      const lastName = getLastName(guest.name)
+
+      // Find other adults with same last name who might be a partner
+      const potentialPartners = sortedGuests.filter(g =>
+        !g.is_child &&
+        g.id !== guest.id &&
+        !processedAdults.has(g.id) &&
+        getLastName(g.name) === lastName
+      )
+
+      // Check if any partner shares kids or has kids with same last name
+      let partner: Guest | null = null
+      for (const p of potentialPartners) {
+        const partnerKids = parentToChildren[p.id] || []
+        // If either has kids with this last name, they're likely partners
+        if (myKids.length > 0 || partnerKids.length > 0) {
+          partner = p
+          break
+        }
+      }
+
+      const groupKey = guest.id + (partner ? `-${partner.id}` : '')
+      const parents = partner ? [guest, partner] : [guest]
+      const allKids = [...myKids]
+      if (partner && parentToChildren[partner.id]) {
+        parentToChildren[partner.id].forEach(kid => {
+          if (!allKids.find(k => k.id === kid.id)) {
+            allKids.push(kid)
+          }
+        })
+      }
+
+      familyGroups[groupKey] = { parents, kids: allKids }
+      processedAdults.add(guest.id)
+      if (partner) processedAdults.add(partner.id)
+    })
+
+    // Add remaining kids without parent links to last-name groups
+    const orphanKids = sortedGuests.filter(g =>
+      g.is_child && !g.parent_id
+    )
+
+    // Convert to final format
+    const result: { family: string, members: Guest[] }[] = []
+
+    Object.values(familyGroups).forEach(({ parents, kids }) => {
+      if (parents.length === 0) return
+
+      const lastName = getLastName(parents[0].name)
+      let familyName: string
+
+      if (kids.length > 0) {
+        // Has kids - use "Parent1 and Parent2 LastName Family" format
+        if (parents.length === 2) {
+          const firstName1 = parents[0].name.split(' ')[0]
+          const firstName2 = parents[1].name.split(' ')[0]
+          familyName = `${firstName1} and ${firstName2} ${lastName} Family`
+        } else {
+          const firstName = parents[0].name.split(' ')[0]
+          familyName = `${firstName} ${lastName} Family`
+        }
+      } else {
+        // No kids - just use last name
+        familyName = lastName
+      }
+
+      // Sort: adults first, kids at bottom
+      const members = [...parents, ...kids]
+      result.push({ family: familyName, members })
+    })
+
+    // Add orphan kids grouped by last name
+    const orphansByLastName: Record<string, Guest[]> = {}
+    orphanKids.forEach(kid => {
+      const lastName = getLastName(kid.name)
+      if (!orphansByLastName[lastName]) orphansByLastName[lastName] = []
+      orphansByLastName[lastName].push(kid)
+    })
+
+    Object.entries(orphansByLastName).forEach(([lastName, kids]) => {
+      // Check if there's already a family group with this last name
+      const existingGroup = result.find(g => g.family.includes(lastName))
+      if (existingGroup) {
+        existingGroup.members.push(...kids)
+      } else {
+        result.push({ family: lastName, members: kids })
+      }
+    })
+
+    return result.sort((a, b) => a.family.localeCompare(b.family))
   }, [sortedGuests])
 
   const handleSelectGuest = (guest: Guest) => {
@@ -195,6 +315,7 @@ export default function GuestsPage() {
       rsvp_status: guest.rsvp_status,
       dietary_restrictions: guest.dietary_restrictions || '',
       is_child: guest.is_child || false,
+      parent_id: guest.parent_id || '',
     })
   }
 
@@ -227,6 +348,7 @@ export default function GuestsPage() {
         rsvp_status: selectedGuest.rsvp_status,
         dietary_restrictions: selectedGuest.dietary_restrictions || '',
         is_child: selectedGuest.is_child || false,
+        parent_id: selectedGuest.parent_id || '',
       })
     }
   }
@@ -506,11 +628,18 @@ export default function GuestsPage() {
                             onClick={() => handleSelectGuest(guest)}
                             className={cn(
                               "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
-                              selectedGuest?.id === guest.id && "bg-primary/5"
+                              selectedGuest?.id === guest.id && "bg-primary/5",
+                              guest.is_child && "pl-8"
                             )}
                           >
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-sm font-medium text-primary">
+                            <div className={cn(
+                              "flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center",
+                              guest.is_child ? "w-8 h-8" : "w-10 h-10"
+                            )}>
+                              <span className={cn(
+                                "font-medium text-primary",
+                                guest.is_child ? "text-xs" : "text-sm"
+                              )}>
                                 {getInitials(guest.name)}
                               </span>
                             </div>
@@ -630,13 +759,32 @@ export default function GuestsPage() {
                     <Switch
                       id="is-child"
                       checked={formData.is_child}
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_child: checked })}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_child: checked, parent_id: checked ? formData.parent_id : '' })}
                     />
                     <Label htmlFor="is-child" className="cursor-pointer flex items-center gap-2">
                       <Baby className="h-4 w-4 text-muted-foreground" />
                       This guest is a child
                     </Label>
                   </div>
+
+                  {formData.is_child && (
+                    <div className="space-y-2">
+                      <Label htmlFor="parent">Parent</Label>
+                      <Select
+                        value={formData.parent_id}
+                        onValueChange={(value) => setFormData({ ...formData, parent_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select parent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getParentOptions(formData.name).map((adult) => (
+                            <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
