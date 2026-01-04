@@ -18,6 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -141,6 +142,7 @@ export default function GuestsPage() {
   const [groupByFamily, setGroupByFamily] = useState(false)
   const [showKids, setShowKids] = useState(true)
   const [viewMode, setViewMode] = useState<'list' | 'table'>('list')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isAddingPartner, setIsAddingPartner] = useState(false)
   const [newPartnerName, setNewPartnerName] = useState('')
   const supabase = createClient()
@@ -630,6 +632,76 @@ export default function GuestsPage() {
     toast.success(`Exported ${guests.length} guests to CSV`)
   }
 
+  // Selection handlers
+  const toggleSelection = (guestId: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(guestId)) {
+        newSet.delete(guestId)
+      } else {
+        newSet.add(guestId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedGuests.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sortedGuests.map(g => g.id)))
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+  }
+
+  // Bulk action handlers
+  const handleBulkRsvp = async (status: 'pending' | 'confirmed' | 'declined') => {
+    if (selectedIds.size === 0) return
+
+    const idsArray = Array.from(selectedIds)
+    const { error } = await supabase
+      .from('guests')
+      .update({ rsvp_status: status, updated_at: new Date().toISOString() })
+      .in('id', idsArray)
+
+    if (error) {
+      toast.error('Failed to update RSVP status')
+      console.error(error)
+    } else {
+      setGuests(guests.map(g =>
+        selectedIds.has(g.id) ? { ...g, rsvp_status: status } : g
+      ))
+      toast.success(`Updated ${selectedIds.size} guests to ${status}`)
+      clearSelection()
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} guests? This cannot be undone.`)) return
+
+    const idsArray = Array.from(selectedIds)
+    const { error } = await supabase
+      .from('guests')
+      .delete()
+      .in('id', idsArray)
+
+    if (error) {
+      toast.error('Failed to delete guests')
+      console.error(error)
+    } else {
+      setGuests(guests.filter(g => !selectedIds.has(g.id)))
+      if (selectedGuest && selectedIds.has(selectedGuest.id)) {
+        setSelectedGuest(null)
+      }
+      toast.success(`Deleted ${selectedIds.size} guests`)
+      clearSelection()
+    }
+  }
+
   if (weddingLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -778,6 +850,51 @@ export default function GuestsPage() {
         </Card>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 mb-4 bg-primary/5 border border-primary/20 rounded-xl">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={selectedIds.size === sortedGuests.length && sortedGuests.length > 0}
+              onCheckedChange={toggleSelectAll}
+            />
+            <span className="text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Set RSVP
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {RSVP_OPTIONS.map((status) => (
+                  <DropdownMenuItem
+                    key={status}
+                    onClick={() => handleBulkRsvp(status)}
+                    className="capitalize"
+                  >
+                    {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                    {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                    {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                    {status}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" onClick={handleBulkDelete} className="text-destructive hover:text-destructive">
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content - List + Detail Layout */}
       <div className="flex-1 flex gap-6 min-h-0 overflow-hidden min-w-0">
         {/* Guest List Panel */}
@@ -925,6 +1042,12 @@ export default function GuestsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={selectedIds.size === sortedGuests.length && sortedGuests.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead className="w-8"></TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Side</TableHead>
@@ -944,6 +1067,12 @@ export default function GuestsPage() {
                         )}
                         onClick={() => handleSelectGuest(guest)}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(guest.id)}
+                            onCheckedChange={() => toggleSelection(guest.id)}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className={cn(
                             "w-2 h-2 rounded-full",
@@ -1051,6 +1180,12 @@ export default function GuestsPage() {
                               guest.is_child && "pl-8"
                             )}
                           >
+                            {/* Checkbox */}
+                            <Checkbox
+                              checked={selectedIds.has(guest.id)}
+                              onCheckedChange={() => toggleSelection(guest.id)}
+                              className="flex-shrink-0"
+                            />
                             {/* Clickable area for guest selection */}
                             <button
                               onClick={() => handleSelectGuest(guest)}
@@ -1154,6 +1289,12 @@ export default function GuestsPage() {
                         selectedGuest?.id === guest.id && "bg-primary/5"
                       )}
                     >
+                      {/* Checkbox */}
+                      <Checkbox
+                        checked={selectedIds.has(guest.id)}
+                        onCheckedChange={() => toggleSelection(guest.id)}
+                        className="flex-shrink-0"
+                      />
                       {/* Clickable area for guest selection */}
                       <button
                         onClick={() => handleSelectGuest(guest)}
