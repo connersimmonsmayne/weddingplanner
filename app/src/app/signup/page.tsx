@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,9 @@ export default function SignupPage() {
       <div className="dark min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
+            <div className="flex justify-center mb-2">
+              <Image src="/logo.svg" alt="Wedding Planner" width={48} height={48} />
+            </div>
             <CardTitle className="text-2xl">Check Your Email</CardTitle>
             <CardDescription>
               We&apos;ve sent a confirmation link to <strong>{email}</strong>
@@ -82,6 +86,9 @@ export default function SignupPage() {
     <div className="dark min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <div className="flex justify-center mb-2">
+            <Image src="/logo.svg" alt="Wedding Planner" width={48} height={48} />
+          </div>
           <CardTitle className="text-2xl">Create Account</CardTitle>
           <CardDescription>Start planning your perfect wedding</CardDescription>
         </CardHeader>
