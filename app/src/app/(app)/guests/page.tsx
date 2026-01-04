@@ -53,6 +53,7 @@ interface GuestFormData {
   dietary_restrictions: string
   is_child: boolean
   parent_id: string
+  partner_id: string
 }
 
 const emptyFormData: GuestFormData = {
@@ -67,6 +68,7 @@ const emptyFormData: GuestFormData = {
   dietary_restrictions: '',
   is_child: false,
   parent_id: '',
+  partner_id: '',
 }
 
 function getInitials(name: string): string {
@@ -108,6 +110,8 @@ export default function GuestsPage() {
   const [saving, setSaving] = useState(false)
   const [groupByFamily, setGroupByFamily] = useState(false)
   const [showKids, setShowKids] = useState(true)
+  const [isAddingPartner, setIsAddingPartner] = useState(false)
+  const [newPartnerName, setNewPartnerName] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -136,8 +140,58 @@ export default function GuestsPage() {
   const uniqueRelationships = [...new Set(guests.map(g => g.relationship).filter(Boolean))]
 
   // Get adult guests for parent dropdown, sorted by same last name first
-  const getParentOptions = (currentGuestName: string) => {
-    const adults = guests.filter(g => !g.is_child)
+  // Returns couples as single options and individual adults
+  const getParentOptions = (currentGuestName: string, currentGuestId?: string) => {
+    const adults = guests.filter(g => !g.is_child && g.id !== currentGuestId)
+    const currentLastName = getLastName(currentGuestName)
+    const processedIds = new Set<string>()
+    const options: { id: string; label: string; isCouple: boolean }[] = []
+
+    adults.forEach(adult => {
+      if (processedIds.has(adult.id)) return
+
+      // Check if this adult has a partner
+      const partner = adult.partner_id ? adults.find(g => g.id === adult.partner_id) : null
+
+      if (partner && !processedIds.has(partner.id)) {
+        // This is a couple - show as single option
+        const firstName1 = adult.name.split(' ')[0]
+        const firstName2 = partner.name.split(' ')[0]
+        const lastName = getLastName(adult.name)
+        options.push({
+          id: adult.id, // Use first partner's ID as the parent_id
+          label: `${firstName1} & ${firstName2} ${lastName}`,
+          isCouple: true,
+        })
+        processedIds.add(adult.id)
+        processedIds.add(partner.id)
+      } else if (!partner) {
+        // Single adult
+        options.push({
+          id: adult.id,
+          label: adult.name,
+          isCouple: false,
+        })
+        processedIds.add(adult.id)
+      }
+    })
+
+    // Sort: same last name first, then alphabetically
+    return options.sort((a, b) => {
+      const aLastName = getLastName(a.label)
+      const bLastName = getLastName(b.label)
+      const aMatch = aLastName === currentLastName
+      const bMatch = bLastName === currentLastName
+
+      if (aMatch && !bMatch) return -1
+      if (!aMatch && bMatch) return 1
+      return a.label.localeCompare(b.label)
+    })
+  }
+
+  // Get adult guests for partner dropdown (exclude current guest and children)
+  const getPartnerOptions = (currentGuestId: string, currentGuestName: string) => {
+    const adults = guests.filter(g => !g.is_child && g.id !== currentGuestId)
     const currentLastName = getLastName(currentGuestName)
 
     return adults.sort((a, b) => {
@@ -187,7 +241,6 @@ export default function GuestsPage() {
   const groupedByFamily = useMemo(() => {
     // Build parent-to-children mapping
     const parentToChildren: Record<string, Guest[]> = {}
-    const adultsWithKids = new Set<string>()
 
     sortedGuests.forEach(guest => {
       if (guest.is_child && guest.parent_id) {
@@ -195,52 +248,38 @@ export default function GuestsPage() {
           parentToChildren[guest.parent_id] = []
         }
         parentToChildren[guest.parent_id].push(guest)
-        adultsWithKids.add(guest.parent_id)
       }
     })
 
-    // Find all unique parent pairs (by checking which adults share the same kids)
+    // Build family groups using partner_id relationships
     const familyGroups: Record<string, { parents: Guest[], kids: Guest[] }> = {}
     const processedAdults = new Set<string>()
 
-    // Group adults that share children
+    // Group adults by partner relationships
     sortedGuests.forEach(guest => {
       if (guest.is_child || processedAdults.has(guest.id)) return
 
-      const myKids = parentToChildren[guest.id] || []
-      const lastName = getLastName(guest.name)
+      // Check if this adult has a partner via partner_id
+      const partner = guest.partner_id
+        ? sortedGuests.find(g => g.id === guest.partner_id && !g.is_child)
+        : null
 
-      // Find other adults with same last name who might be a partner
-      const potentialPartners = sortedGuests.filter(g =>
-        !g.is_child &&
-        g.id !== guest.id &&
-        !processedAdults.has(g.id) &&
-        getLastName(g.name) === lastName
-      )
-
-      // Check if any partner shares kids or has kids with same last name
-      let partner: Guest | null = null
-      for (const p of potentialPartners) {
-        const partnerKids = parentToChildren[p.id] || []
-        // If either has kids with this last name, they're likely partners
-        if (myKids.length > 0 || partnerKids.length > 0) {
-          partner = p
-          break
-        }
-      }
-
-      const groupKey = guest.id + (partner ? `-${partner.id}` : '')
       const parents = partner ? [guest, partner] : [guest]
-      const allKids = [...myKids]
-      if (partner && parentToChildren[partner.id]) {
-        parentToChildren[partner.id].forEach(kid => {
+
+      // Collect kids from both parents
+      const allKids: Guest[] = []
+      parents.forEach(parent => {
+        const kids = parentToChildren[parent.id] || []
+        kids.forEach(kid => {
           if (!allKids.find(k => k.id === kid.id)) {
             allKids.push(kid)
           }
         })
-      }
+      })
 
+      const groupKey = guest.id + (partner ? `-${partner.id}` : '')
       familyGroups[groupKey] = { parents, kids: allKids }
+
       processedAdults.add(guest.id)
       if (partner) processedAdults.add(partner.id)
     })
@@ -316,6 +355,7 @@ export default function GuestsPage() {
       dietary_restrictions: guest.dietary_restrictions || '',
       is_child: guest.is_child || false,
       parent_id: guest.parent_id || '',
+      partner_id: guest.partner_id || '',
     })
   }
 
@@ -349,6 +389,7 @@ export default function GuestsPage() {
         dietary_restrictions: selectedGuest.dietary_restrictions || '',
         is_child: selectedGuest.is_child || false,
         parent_id: selectedGuest.parent_id || '',
+        partner_id: selectedGuest.partner_id || '',
       })
     }
   }
@@ -367,10 +408,11 @@ export default function GuestsPage() {
 
     setSaving(true)
 
-    // Convert empty parent_id to null for database
+    // Convert empty IDs to null for database
     const dataToSave = {
       ...formData,
       parent_id: formData.parent_id || null,
+      partner_id: formData.partner_id || null,
     }
 
     if (isCreating) {
@@ -388,7 +430,18 @@ export default function GuestsPage() {
         toast.error('Failed to add guest')
         console.error(error)
       } else {
-        setGuests([...guests, data])
+        // Auto-link partner bidirectionally
+        if (data.partner_id) {
+          await supabase
+            .from('guests')
+            .update({ partner_id: data.id })
+            .eq('id', data.partner_id)
+          // Update local state for partner
+          setGuests(prev => prev.map(g =>
+            g.id === data.partner_id ? { ...g, partner_id: data.id } : g
+          ))
+        }
+        setGuests(prev => [...prev, data])
         toast.success('Guest added')
         setIsCreating(false)
         setSelectedGuest(data)
@@ -408,7 +461,38 @@ export default function GuestsPage() {
         console.error(error)
       } else {
         const updatedGuest = { ...selectedGuest, ...formData }
-        setGuests(guests.map(g => g.id === selectedGuest.id ? updatedGuest : g))
+
+        // Handle bidirectional partner linking
+        const oldPartnerId = selectedGuest.partner_id
+        const newPartnerId = formData.partner_id || null
+
+        // If partner changed, update bidirectional links
+        if (oldPartnerId !== newPartnerId) {
+          // Remove old partner's link to this guest
+          if (oldPartnerId) {
+            await supabase
+              .from('guests')
+              .update({ partner_id: null })
+              .eq('id', oldPartnerId)
+          }
+          // Add new partner's link to this guest
+          if (newPartnerId) {
+            await supabase
+              .from('guests')
+              .update({ partner_id: selectedGuest.id })
+              .eq('id', newPartnerId)
+          }
+          // Update local state for partners
+          setGuests(prev => prev.map(g => {
+            if (g.id === oldPartnerId) return { ...g, partner_id: null }
+            if (g.id === newPartnerId) return { ...g, partner_id: selectedGuest.id }
+            if (g.id === selectedGuest.id) return updatedGuest
+            return g
+          }))
+        } else {
+          setGuests(guests.map(g => g.id === selectedGuest.id ? updatedGuest : g))
+        }
+
         setSelectedGuest(updatedGuest)
         toast.success('Guest updated')
         setIsEditing(false)
@@ -765,7 +849,12 @@ export default function GuestsPage() {
                     <Switch
                       id="is-child"
                       checked={formData.is_child}
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_child: checked, parent_id: checked ? formData.parent_id : '' })}
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        is_child: checked,
+                        parent_id: checked ? formData.parent_id : '',
+                        partner_id: checked ? '' : formData.partner_id, // Clear partner if becoming child
+                      })}
                     />
                     <Label htmlFor="is-child" className="cursor-pointer flex items-center gap-2">
                       <Baby className="h-4 w-4 text-muted-foreground" />
@@ -773,7 +862,7 @@ export default function GuestsPage() {
                     </Label>
                   </div>
 
-                  {formData.is_child && (
+                  {formData.is_child ? (
                     <div className="space-y-2">
                       <Label htmlFor="parent">Parent</Label>
                       <Select
@@ -784,11 +873,97 @@ export default function GuestsPage() {
                           <SelectValue placeholder="Select parent" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getParentOptions(formData.name).map((adult) => (
-                            <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                          {getParentOptions(formData.name, selectedGuest?.id).map((option) => (
+                            <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="partner">Partner</Label>
+                      {isAddingPartner ? (
+                        <div className="flex gap-2">
+                          <Input
+                            value={newPartnerName}
+                            onChange={(e) => setNewPartnerName(e.target.value)}
+                            placeholder="Partner's full name"
+                            autoFocus
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={!newPartnerName.trim()}
+                            onClick={async () => {
+                              if (!wedding?.id || !newPartnerName.trim()) return
+                              // Create new partner guest
+                              const { data: newPartner, error } = await supabase
+                                .from('guests')
+                                .insert({
+                                  name: newPartnerName.trim(),
+                                  wedding_id: wedding.id,
+                                  group_name: formData.group_name || null,
+                                  rsvp_status: 'pending',
+                                  is_child: false,
+                                })
+                                .select()
+                                .single()
+
+                              if (error) {
+                                toast.error('Failed to create partner')
+                              } else {
+                                setGuests(prev => [...prev, newPartner])
+                                setFormData({ ...formData, partner_id: newPartner.id })
+                                setNewPartnerName('')
+                                setIsAddingPartner(false)
+                                toast.success('Partner added')
+                              }
+                            }}
+                          >
+                            Create
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsAddingPartner(false)
+                              setNewPartnerName('')
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={formData.partner_id}
+                          onValueChange={(value) => {
+                            if (value === '__add_new__') {
+                              setIsAddingPartner(true)
+                            } else {
+                              setFormData({ ...formData, partner_id: value })
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select partner (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectedGuest?.id && getPartnerOptions(selectedGuest.id, formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
+                            {!selectedGuest?.id && getPartnerOptions('', formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
+                            <SelectItem value="__add_new__" className="text-primary">
+                              <span className="flex items-center gap-2">
+                                <Plus className="h-4 w-4" />
+                                Add new partner
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   )}
 
