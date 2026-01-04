@@ -1035,7 +1035,8 @@ export default function GuestsPage() {
                               key={guest.id}
                               className={cn(
                                 "cursor-pointer",
-                                selectedGuest?.id === guest.id && "bg-primary/5"
+                                selectedGuest?.id === guest.id && "bg-primary/5",
+                                members.length > 1 && "border-l-2 border-l-primary/30 bg-muted/30"
                               )}
                               onClick={() => handleSelectGuest(guest)}
                             >
