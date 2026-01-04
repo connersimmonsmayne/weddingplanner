@@ -798,7 +798,16 @@ export default function GuestsPage() {
                   {isCreating ? 'New Guest' : (isEditing ? 'Edit Guest' : 'Guest Details')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {!isCreating && !isEditing && selectedGuest && (
+                  {(isEditing || isCreating) ? (
+                    <>
+                      <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={handleSave} disabled={saving}>
+                        {saving ? 'Saving...' : (isCreating ? 'Add Guest' : 'Save')}
+                      </Button>
+                    </>
+                  ) : selectedGuest && (
                     <>
                       <Button variant="outline" size="sm" onClick={handleStartEdit}>
                         Edit
@@ -1060,14 +1069,6 @@ export default function GuestsPage() {
                     />
                   </div>
 
-                  <div className="flex gap-3 pt-4">
-                    <Button variant="outline" className="flex-1" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                    <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                      {saving ? 'Saving...' : (isCreating ? 'Add Guest' : 'Save Changes')}
-                    </Button>
-                  </div>
                 </div>
               ) : selectedGuest ? (
                 /* View Mode */
