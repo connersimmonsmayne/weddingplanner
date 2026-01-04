@@ -450,6 +450,9 @@ export default function GuestsPage() {
                 </Label>
               </div>
             </div>
+            <div className="text-sm text-muted-foreground">
+              Showing {sortedGuests.length} of {guests.length} guests
+            </div>
           </div>
 
           {/* Guest List */}
