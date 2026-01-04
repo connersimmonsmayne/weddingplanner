@@ -32,7 +32,8 @@ import {
   UserPlus,
   Tag,
   Heart,
-  Trash2
+  Trash2,
+  Baby
 } from 'lucide-react'
 import { CSVUploadDialog } from '@/components/ui/csv-upload-dialog'
 import { cn } from '@/lib/utils'
@@ -50,6 +51,9 @@ interface GuestFormData {
   notes: string
   rsvp_status: 'pending' | 'confirmed' | 'declined'
   dietary_restrictions: string
+  is_child: boolean
+  parent_id: string
+  partner_id: string
 }
 
 const emptyFormData: GuestFormData = {
@@ -62,6 +66,9 @@ const emptyFormData: GuestFormData = {
   notes: '',
   rsvp_status: 'pending',
   dietary_restrictions: '',
+  is_child: false,
+  parent_id: '',
+  partner_id: '',
 }
 
 function getInitials(name: string): string {
@@ -92,7 +99,9 @@ export default function GuestsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRsvp, setFilterRsvp] = useState<string>('all')
-  const [filterGroup, setFilterGroup] = useState<string>('all')
+  const [filterSide, setFilterSide] = useState<string>('all')
+  const [filterRelationship, setFilterRelationship] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('name-asc')
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -100,6 +109,9 @@ export default function GuestsPage() {
   const [formData, setFormData] = useState<GuestFormData>(emptyFormData)
   const [saving, setSaving] = useState(false)
   const [groupByFamily, setGroupByFamily] = useState(false)
+  const [showKids, setShowKids] = useState(true)
+  const [isAddingPartner, setIsAddingPartner] = useState(false)
+  const [newPartnerName, setNewPartnerName] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -125,7 +137,80 @@ export default function GuestsPage() {
     setLoading(false)
   }
 
-  const uniqueGroups = [...new Set(guests.map(g => g.group_name).filter(Boolean))]
+  const uniqueRelationships = [...new Set(guests.map(g => g.relationship).filter(Boolean))]
+
+  // Get adult guests for parent dropdown, sorted by same last name first
+  // Returns couples as single options and individual adults
+  const getParentOptions = (currentGuestName: string, currentGuestId?: string) => {
+    const adults = guests.filter(g => !g.is_child && g.id !== currentGuestId)
+    const currentLastName = getLastName(currentGuestName)
+    const processedIds = new Set<string>()
+    const options: { id: string; label: string; isCouple: boolean }[] = []
+
+    adults.forEach(adult => {
+      if (processedIds.has(adult.id)) return
+
+      // Check if this adult has a partner
+      const partner = adult.partner_id ? adults.find(g => g.id === adult.partner_id) : null
+
+      if (partner && !processedIds.has(partner.id)) {
+        // This is a couple - show as single option
+        const firstName1 = adult.name.split(' ')[0]
+        const firstName2 = partner.name.split(' ')[0]
+        const lastName = getLastName(adult.name)
+        options.push({
+          id: adult.id, // Use first partner's ID as the parent_id
+          label: `${firstName1} & ${firstName2} ${lastName}`,
+          isCouple: true,
+        })
+        processedIds.add(adult.id)
+        processedIds.add(partner.id)
+      } else if (!partner) {
+        // Single adult
+        options.push({
+          id: adult.id,
+          label: adult.name,
+          isCouple: false,
+        })
+        processedIds.add(adult.id)
+      }
+    })
+
+    // Sort: same last name first, then alphabetically
+    return options.sort((a, b) => {
+      const aLastName = getLastName(a.label)
+      const bLastName = getLastName(b.label)
+      const aMatch = aLastName === currentLastName
+      const bMatch = bLastName === currentLastName
+
+      if (aMatch && !bMatch) return -1
+      if (!aMatch && bMatch) return 1
+      return a.label.localeCompare(b.label)
+    })
+  }
+
+  // Get adult guests for partner dropdown (exclude current guest and children)
+  const getPartnerOptions = (currentGuestId: string, currentGuestName: string) => {
+    const adults = guests.filter(g => !g.is_child && g.id !== currentGuestId)
+    const currentLastName = getLastName(currentGuestName)
+
+    return adults.sort((a, b) => {
+      const aLastName = getLastName(a.name)
+      const bLastName = getLastName(b.name)
+      const aMatch = aLastName === currentLastName
+      const bMatch = bLastName === currentLastName
+
+      if (aMatch && !bMatch) return -1
+      if (!aMatch && bMatch) return 1
+      return a.name.localeCompare(b.name)
+    })
+  }
+
+  const sideOptions = wedding ? [
+    { value: `${wedding.partner1_name.split(' ')[0]}'s Side`, label: `${wedding.partner1_name}'s Side` },
+    { value: `${wedding.partner2_name.split(' ')[0]}'s Side`, label: `${wedding.partner2_name}'s Side` },
+    { value: 'Shared', label: 'Shared' },
+  ] : []
 
   const filteredGuests = guests.filter(guest => {
     const matchesSearch = guest.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -133,25 +218,111 @@ export default function GuestsPage() {
       guest.notes?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesRsvp = filterRsvp === 'all' || guest.rsvp_status === filterRsvp
-    const matchesGroup = filterGroup === 'all' || guest.group_name === filterGroup
+    const matchesSide = filterSide === 'all' || guest.group_name?.startsWith(filterSide)
+    const matchesRelationship = filterRelationship === 'all' || guest.relationship === filterRelationship
+    const matchesKids = showKids || !guest.is_child
 
-    return matchesSearch && matchesRsvp && matchesGroup
+    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship && matchesKids
   })
 
-  const groupedByFamily = useMemo(() => {
-    const groups: Record<string, Guest[]> = {}
-    filteredGuests.forEach(guest => {
-      const lastName = getLastName(guest.name)
-      if (!groups[lastName]) groups[lastName] = []
-      groups[lastName].push(guest)
+  const sortedGuests = useMemo(() => {
+    return [...filteredGuests].sort((a, b) => {
+      switch (sortBy) {
+        case 'name-desc': return b.name.localeCompare(a.name)
+        case 'last-name': return getLastName(a.name).localeCompare(getLastName(b.name))
+        case 'rsvp':
+          const order: Record<string, number> = { confirmed: 0, pending: 1, declined: 2 }
+          return order[a.rsvp_status] - order[b.rsvp_status]
+        default: return a.name.localeCompare(b.name) // name-asc
+      }
     })
-    return Object.entries(groups)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([family, members]) => ({
-        family,
-        members: members.sort((a, b) => a.name.localeCompare(b.name))
-      }))
-  }, [filteredGuests])
+  }, [filteredGuests, sortBy])
+
+  const groupedByFamily = useMemo(() => {
+    // Build parent-to-children mapping
+    const parentToChildren: Record<string, Guest[]> = {}
+
+    sortedGuests.forEach(guest => {
+      if (guest.is_child && guest.parent_id) {
+        if (!parentToChildren[guest.parent_id]) {
+          parentToChildren[guest.parent_id] = []
+        }
+        parentToChildren[guest.parent_id].push(guest)
+      }
+    })
+
+    // Build family groups using ONLY partner_id relationships
+    const result: { family: string, members: Guest[], key: string }[] = []
+    const processedAdults = new Set<string>()
+    const processedKids = new Set<string>()
+
+    // Group adults by partner relationships
+    sortedGuests.forEach(guest => {
+      if (guest.is_child || processedAdults.has(guest.id)) return
+
+      // Check if this adult has a partner via partner_id
+      const partner = guest.partner_id
+        ? sortedGuests.find(g => g.id === guest.partner_id && !g.is_child)
+        : null
+
+      const parents = partner ? [guest, partner] : [guest]
+
+      // Collect kids linked to either parent
+      const allKids: Guest[] = []
+      parents.forEach(parent => {
+        const kids = parentToChildren[parent.id] || []
+        kids.forEach(kid => {
+          if (!allKids.find(k => k.id === kid.id)) {
+            allKids.push(kid)
+            processedKids.add(kid.id)
+          }
+        })
+      })
+
+      // Build family name based on relationships
+      const lastName = getLastName(parents[0].name)
+      let familyName: string
+
+      if (allKids.length > 0) {
+        // Has kids - use "Parent1 and Parent2 LastName Family" format
+        if (parents.length === 2) {
+          const firstName1 = parents[0].name.split(' ')[0]
+          const firstName2 = parents[1].name.split(' ')[0]
+          familyName = `${firstName1} and ${firstName2} ${lastName} Family`
+        } else {
+          familyName = `${parents[0].name} Family`
+        }
+      } else if (parents.length === 2) {
+        // Couple without kids
+        const firstName1 = parents[0].name.split(' ')[0]
+        const firstName2 = parents[1].name.split(' ')[0]
+        familyName = `${firstName1} and ${firstName2} ${lastName}`
+      } else {
+        // Single adult - just their name
+        familyName = guest.name
+      }
+
+      const members = [...parents, ...allKids]
+      const key = guest.id + (partner ? `-${partner.id}` : '')
+      result.push({ family: familyName, members, key })
+
+      processedAdults.add(guest.id)
+      if (partner) processedAdults.add(partner.id)
+    })
+
+    // Add unlinked kids as individuals
+    sortedGuests.forEach(guest => {
+      if (guest.is_child && !processedKids.has(guest.id)) {
+        result.push({
+          family: guest.name,
+          members: [guest],
+          key: guest.id
+        })
+      }
+    })
+
+    return result.sort((a, b) => a.family.localeCompare(b.family))
+  }, [sortedGuests])
 
   const handleSelectGuest = (guest: Guest) => {
     setSelectedGuest(guest)
@@ -167,6 +338,9 @@ export default function GuestsPage() {
       notes: guest.notes || '',
       rsvp_status: guest.rsvp_status,
       dietary_restrictions: guest.dietary_restrictions || '',
+      is_child: guest.is_child || false,
+      parent_id: guest.parent_id || '',
+      partner_id: guest.partner_id || '',
     })
   }
 
@@ -198,6 +372,9 @@ export default function GuestsPage() {
         notes: selectedGuest.notes || '',
         rsvp_status: selectedGuest.rsvp_status,
         dietary_restrictions: selectedGuest.dietary_restrictions || '',
+        is_child: selectedGuest.is_child || false,
+        parent_id: selectedGuest.parent_id || '',
+        partner_id: selectedGuest.partner_id || '',
       })
     }
   }
@@ -216,12 +393,19 @@ export default function GuestsPage() {
 
     setSaving(true)
 
+    // Convert empty IDs to null for database
+    const dataToSave = {
+      ...formData,
+      parent_id: formData.parent_id || null,
+      partner_id: formData.partner_id || null,
+    }
+
     if (isCreating) {
       // Create new guest
       const { data, error } = await supabase
         .from('guests')
         .insert({
-          ...formData,
+          ...dataToSave,
           wedding_id: wedding.id,
         })
         .select()
@@ -231,7 +415,18 @@ export default function GuestsPage() {
         toast.error('Failed to add guest')
         console.error(error)
       } else {
-        setGuests([...guests, data])
+        // Auto-link partner bidirectionally
+        if (data.partner_id) {
+          await supabase
+            .from('guests')
+            .update({ partner_id: data.id })
+            .eq('id', data.partner_id)
+          // Update local state for partner
+          setGuests(prev => prev.map(g =>
+            g.id === data.partner_id ? { ...g, partner_id: data.id } : g
+          ))
+        }
+        setGuests(prev => [...prev, data])
         toast.success('Guest added')
         setIsCreating(false)
         setSelectedGuest(data)
@@ -241,7 +436,7 @@ export default function GuestsPage() {
       const { error } = await supabase
         .from('guests')
         .update({
-          ...formData,
+          ...dataToSave,
           updated_at: new Date().toISOString(),
         })
         .eq('id', selectedGuest.id)
@@ -251,7 +446,38 @@ export default function GuestsPage() {
         console.error(error)
       } else {
         const updatedGuest = { ...selectedGuest, ...formData }
-        setGuests(guests.map(g => g.id === selectedGuest.id ? updatedGuest : g))
+
+        // Handle bidirectional partner linking
+        const oldPartnerId = selectedGuest.partner_id
+        const newPartnerId = formData.partner_id || null
+
+        // If partner changed, update bidirectional links
+        if (oldPartnerId !== newPartnerId) {
+          // Remove old partner's link to this guest
+          if (oldPartnerId) {
+            await supabase
+              .from('guests')
+              .update({ partner_id: null })
+              .eq('id', oldPartnerId)
+          }
+          // Add new partner's link to this guest
+          if (newPartnerId) {
+            await supabase
+              .from('guests')
+              .update({ partner_id: selectedGuest.id })
+              .eq('id', newPartnerId)
+          }
+          // Update local state for partners
+          setGuests(prev => prev.map(g => {
+            if (g.id === oldPartnerId) return { ...g, partner_id: null }
+            if (g.id === newPartnerId) return { ...g, partner_id: selectedGuest.id }
+            if (g.id === selectedGuest.id) return updatedGuest
+            return g
+          }))
+        } else {
+          setGuests(guests.map(g => g.id === selectedGuest.id ? updatedGuest : g))
+        }
+
         setSelectedGuest(updatedGuest)
         toast.success('Guest updated')
         setIsEditing(false)
@@ -382,34 +608,71 @@ export default function GuestsPage() {
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterGroup} onValueChange={setFilterGroup}>
+              <Select value={filterSide} onValueChange={setFilterSide}>
                 <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Group" />
+                  <SelectValue placeholder="Side" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Groups</SelectItem>
-                  {uniqueGroups.map((group) => (
-                    <SelectItem key={group} value={group!}>{group}</SelectItem>
+                  <SelectItem value="all">All Sides</SelectItem>
+                  {sideOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterRelationship} onValueChange={setFilterRelationship}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Relationship" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Relationships</SelectItem>
+                  {uniqueRelationships.map((rel) => (
+                    <SelectItem key={rel} value={rel!}>{rel}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="group-by-family"
-                checked={groupByFamily}
-                onCheckedChange={setGroupByFamily}
-              />
-              <Label htmlFor="group-by-family" className="text-sm text-muted-foreground cursor-pointer">
-                Group by family
-              </Label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                  <SelectItem value="last-name">Last Name</SelectItem>
+                  <SelectItem value="rsvp">RSVP Status</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="group-by-family"
+                  checked={groupByFamily}
+                  onCheckedChange={setGroupByFamily}
+                />
+                <Label htmlFor="group-by-family" className="text-sm text-muted-foreground cursor-pointer">
+                  Group by family
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-kids"
+                  checked={showKids}
+                  onCheckedChange={setShowKids}
+                />
+                <Label htmlFor="show-kids" className="text-sm text-muted-foreground cursor-pointer">
+                  Show kids
+                </Label>
+              </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Showing {sortedGuests.length} of {guests.length} guests
             </div>
           </div>
 
           {/* Guest List */}
           <Card className="flex-1 overflow-hidden">
             <CardContent className="p-0 h-full overflow-y-auto">
-              {filteredGuests.length === 0 ? (
+              {sortedGuests.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Users className="h-12 w-12 text-muted-foreground/50 mb-3" />
                   <p className="text-muted-foreground">
@@ -425,8 +688,8 @@ export default function GuestsPage() {
               ) : groupByFamily ? (
                 /* Grouped by Family View */
                 <div>
-                  {groupedByFamily.map(({ family, members }) => (
-                    <div key={family}>
+                  {groupedByFamily.map(({ family, members, key }) => (
+                    <div key={key}>
                       {/* Family Header */}
                       <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
                         <span className="font-semibold text-sm">{family}</span>
@@ -440,18 +703,30 @@ export default function GuestsPage() {
                             onClick={() => handleSelectGuest(guest)}
                             className={cn(
                               "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
-                              selectedGuest?.id === guest.id && "bg-primary/5"
+                              selectedGuest?.id === guest.id && "bg-primary/5",
+                              guest.is_child && "pl-8"
                             )}
                           >
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-sm font-medium text-primary">
+                            <div className={cn(
+                              "flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center",
+                              guest.is_child ? "w-8 h-8" : "w-10 h-10"
+                            )}>
+                              <span className={cn(
+                                "font-medium text-primary",
+                                guest.is_child ? "text-xs" : "text-sm"
+                              )}>
                                 {getInitials(guest.name)}
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{guest.name}</div>
+                              <div className="font-medium truncate flex items-center gap-1.5">
+                                {guest.name}
+                                {guest.is_child && (
+                                  <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                )}
+                              </div>
                               <div className="text-sm text-muted-foreground truncate">
-                                {guest.group_name || guest.relationship || 'No group'}
+                                {guest.relationship || guest.group_name || 'No info'}
                               </div>
                             </div>
                             <Badge
@@ -469,7 +744,7 @@ export default function GuestsPage() {
               ) : (
                 /* Flat List View */
                 <div className="divide-y">
-                  {filteredGuests.map((guest) => (
+                  {sortedGuests.map((guest) => (
                     <button
                       key={guest.id}
                       onClick={() => handleSelectGuest(guest)}
@@ -487,7 +762,12 @@ export default function GuestsPage() {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{guest.name}</div>
+                        <div className="font-medium truncate flex items-center gap-1.5">
+                          {guest.name}
+                          {guest.is_child && (
+                            <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          )}
+                        </div>
                         <div className="text-sm text-muted-foreground truncate">
                           {guest.group_name || guest.relationship || 'No group'}
                         </div>
@@ -550,15 +830,145 @@ export default function GuestsPage() {
                     />
                   </div>
 
+                  <div className="flex items-center gap-3 py-2">
+                    <Switch
+                      id="is-child"
+                      checked={formData.is_child}
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        is_child: checked,
+                        parent_id: checked ? formData.parent_id : '',
+                        partner_id: checked ? '' : formData.partner_id, // Clear partner if becoming child
+                      })}
+                    />
+                    <Label htmlFor="is-child" className="cursor-pointer flex items-center gap-2">
+                      <Baby className="h-4 w-4 text-muted-foreground" />
+                      This guest is a child
+                    </Label>
+                  </div>
+
+                  {formData.is_child ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="parent">Parent</Label>
+                      <Select
+                        value={formData.parent_id}
+                        onValueChange={(value) => setFormData({ ...formData, parent_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select parent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getParentOptions(formData.name, selectedGuest?.id).map((option) => (
+                            <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="partner">Partner</Label>
+                      {isAddingPartner ? (
+                        <div className="flex gap-2">
+                          <Input
+                            value={newPartnerName}
+                            onChange={(e) => setNewPartnerName(e.target.value)}
+                            placeholder="Partner's full name"
+                            autoFocus
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={!newPartnerName.trim()}
+                            onClick={async () => {
+                              if (!wedding?.id || !newPartnerName.trim()) return
+                              // Create new partner guest
+                              const { data: newPartner, error } = await supabase
+                                .from('guests')
+                                .insert({
+                                  id: crypto.randomUUID(),
+                                  name: newPartnerName.trim(),
+                                  wedding_id: wedding.id,
+                                  group_name: formData.group_name || null,
+                                  rsvp_status: 'pending',
+                                  is_child: false,
+                                })
+                                .select()
+                                .single()
+
+                              if (error) {
+                                toast.error('Failed to create partner')
+                              } else {
+                                setGuests(prev => [...prev, newPartner])
+                                setFormData({ ...formData, partner_id: newPartner.id })
+                                setNewPartnerName('')
+                                setIsAddingPartner(false)
+                                toast.success('Partner added')
+                              }
+                            }}
+                          >
+                            Create
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsAddingPartner(false)
+                              setNewPartnerName('')
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={formData.partner_id}
+                          onValueChange={(value) => {
+                            if (value === '__add_new__') {
+                              setIsAddingPartner(true)
+                            } else {
+                              setFormData({ ...formData, partner_id: value })
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select partner (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectedGuest?.id && getPartnerOptions(selectedGuest.id, formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
+                            {!selectedGuest?.id && getPartnerOptions('', formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
+                            <SelectItem value="__add_new__" className="text-primary">
+                              <span className="flex items-center gap-2">
+                                <Plus className="h-4 w-4" />
+                                Add new partner
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="group">Group</Label>
-                      <Input
-                        id="group"
-                        value={formData.group_name}
-                        onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-                        placeholder="e.g., Bride's Family"
-                      />
+                      <Label htmlFor="side">Side</Label>
+                      <Select
+                        value={formData.group_name || ''}
+                        onValueChange={(value) => setFormData({ ...formData, group_name: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select side" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sideOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="relationship">Relationship</Label>
@@ -670,7 +1080,12 @@ export default function GuestsPage() {
                       </span>
                     </div>
                     <div>
-                      <h2 className="text-xl font-semibold">{selectedGuest.name}</h2>
+                      <h2 className="text-xl font-semibold flex items-center gap-2">
+                        {selectedGuest.name}
+                        {selectedGuest.is_child && (
+                          <Baby className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </h2>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge
                           variant={getRsvpBadgeVariant(selectedGuest.rsvp_status)}
@@ -709,7 +1124,7 @@ export default function GuestsPage() {
                       <div className="flex items-start gap-3">
                         <Tag className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Group</p>
+                          <p className="text-sm text-muted-foreground">Side</p>
                           <p className="font-medium">{selectedGuest.group_name}</p>
                         </div>
                       </div>

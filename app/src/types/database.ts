@@ -86,6 +86,9 @@ export interface Database {
           notes: string | null
           rsvp_status: 'pending' | 'confirmed' | 'declined'
           dietary_restrictions: string | null
+          is_child: boolean
+          parent_id: string | null
+          partner_id: string | null
           created_at: string
           updated_at: string
         }
@@ -101,6 +104,9 @@ export interface Database {
           notes?: string | null
           rsvp_status?: 'pending' | 'confirmed' | 'declined'
           dietary_restrictions?: string | null
+          is_child?: boolean
+          parent_id?: string | null
+          partner_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -116,6 +122,9 @@ export interface Database {
           notes?: string | null
           rsvp_status?: 'pending' | 'confirmed' | 'declined'
           dietary_restrictions?: string | null
+          is_child?: boolean
+          parent_id?: string | null
+          partner_id?: string | null
           created_at?: string
           updated_at?: string
         }
