@@ -32,7 +32,8 @@ import {
   UserPlus,
   Tag,
   Heart,
-  Trash2
+  Trash2,
+  Baby
 } from 'lucide-react'
 import { CSVUploadDialog } from '@/components/ui/csv-upload-dialog'
 import { cn } from '@/lib/utils'
@@ -50,6 +51,7 @@ interface GuestFormData {
   notes: string
   rsvp_status: 'pending' | 'confirmed' | 'declined'
   dietary_restrictions: string
+  is_child: boolean
 }
 
 const emptyFormData: GuestFormData = {
@@ -62,6 +64,7 @@ const emptyFormData: GuestFormData = {
   notes: '',
   rsvp_status: 'pending',
   dietary_restrictions: '',
+  is_child: false,
 }
 
 function getInitials(name: string): string {
@@ -102,6 +105,7 @@ export default function GuestsPage() {
   const [formData, setFormData] = useState<GuestFormData>(emptyFormData)
   const [saving, setSaving] = useState(false)
   const [groupByFamily, setGroupByFamily] = useState(false)
+  const [showKids, setShowKids] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
@@ -143,8 +147,9 @@ export default function GuestsPage() {
     const matchesRsvp = filterRsvp === 'all' || guest.rsvp_status === filterRsvp
     const matchesSide = filterSide === 'all' || guest.group_name?.startsWith(filterSide)
     const matchesRelationship = filterRelationship === 'all' || guest.relationship === filterRelationship
+    const matchesKids = showKids || !guest.is_child
 
-    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship
+    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship && matchesKids
   })
 
   const sortedGuests = useMemo(() => {
@@ -189,6 +194,7 @@ export default function GuestsPage() {
       notes: guest.notes || '',
       rsvp_status: guest.rsvp_status,
       dietary_restrictions: guest.dietary_restrictions || '',
+      is_child: guest.is_child || false,
     })
   }
 
@@ -220,6 +226,7 @@ export default function GuestsPage() {
         notes: selectedGuest.notes || '',
         rsvp_status: selectedGuest.rsvp_status,
         dietary_restrictions: selectedGuest.dietary_restrictions || '',
+        is_child: selectedGuest.is_child || false,
       })
     }
   }
@@ -427,7 +434,7 @@ export default function GuestsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Sort by" />
@@ -447,6 +454,16 @@ export default function GuestsPage() {
                 />
                 <Label htmlFor="group-by-family" className="text-sm text-muted-foreground cursor-pointer">
                   Group by family
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-kids"
+                  checked={showKids}
+                  onCheckedChange={setShowKids}
+                />
+                <Label htmlFor="show-kids" className="text-sm text-muted-foreground cursor-pointer">
+                  Show kids
                 </Label>
               </div>
             </div>
@@ -498,7 +515,12 @@ export default function GuestsPage() {
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{guest.name}</div>
+                              <div className="font-medium truncate flex items-center gap-1.5">
+                                {guest.name}
+                                {guest.is_child && (
+                                  <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                )}
+                              </div>
                               <div className="text-sm text-muted-foreground truncate">
                                 {guest.relationship || guest.group_name || 'No info'}
                               </div>
@@ -536,7 +558,12 @@ export default function GuestsPage() {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{guest.name}</div>
+                        <div className="font-medium truncate flex items-center gap-1.5">
+                          {guest.name}
+                          {guest.is_child && (
+                            <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          )}
+                        </div>
                         <div className="text-sm text-muted-foreground truncate">
                           {guest.group_name || guest.relationship || 'No group'}
                         </div>
@@ -597,6 +624,18 @@ export default function GuestsPage() {
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Guest name"
                     />
+                  </div>
+
+                  <div className="flex items-center gap-3 py-2">
+                    <Switch
+                      id="is-child"
+                      checked={formData.is_child}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_child: checked })}
+                    />
+                    <Label htmlFor="is-child" className="cursor-pointer flex items-center gap-2">
+                      <Baby className="h-4 w-4 text-muted-foreground" />
+                      This guest is a child
+                    </Label>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -726,7 +765,12 @@ export default function GuestsPage() {
                       </span>
                     </div>
                     <div>
-                      <h2 className="text-xl font-semibold">{selectedGuest.name}</h2>
+                      <h2 className="text-xl font-semibold flex items-center gap-2">
+                        {selectedGuest.name}
+                        {selectedGuest.is_child && (
+                          <Baby className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </h2>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge
                           variant={getRsvpBadgeVariant(selectedGuest.rsvp_status)}
