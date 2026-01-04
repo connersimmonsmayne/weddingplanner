@@ -367,12 +367,18 @@ export default function GuestsPage() {
 
     setSaving(true)
 
+    // Convert empty parent_id to null for database
+    const dataToSave = {
+      ...formData,
+      parent_id: formData.parent_id || null,
+    }
+
     if (isCreating) {
       // Create new guest
       const { data, error } = await supabase
         .from('guests')
         .insert({
-          ...formData,
+          ...dataToSave,
           wedding_id: wedding.id,
         })
         .select()
@@ -392,7 +398,7 @@ export default function GuestsPage() {
       const { error } = await supabase
         .from('guests')
         .update({
-          ...formData,
+          ...dataToSave,
           updated_at: new Date().toISOString(),
         })
         .eq('id', selectedGuest.id)
