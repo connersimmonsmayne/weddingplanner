@@ -885,6 +885,7 @@ export default function GuestsPage() {
                               const { data: newPartner, error } = await supabase
                                 .from('guests')
                                 .insert({
+                                  id: crypto.randomUUID(),
                                   name: newPartnerName.trim(),
                                   wedding_id: wedding.id,
                                   group_name: formData.group_name || null,
