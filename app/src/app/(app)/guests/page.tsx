@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
 import { Guest } from '@/types/database'
@@ -562,6 +562,25 @@ export default function GuestsPage() {
     }
   }
 
+  const handleQuickSide = async (guest: Guest, side: string) => {
+    const { error } = await supabase
+      .from('guests')
+      .update({ group_name: side, updated_at: new Date().toISOString() })
+      .eq('id', guest.id)
+
+    if (error) {
+      toast.error('Failed to update side')
+    } else {
+      const updatedGuest = { ...guest, group_name: side }
+      setGuests(guests.map(g => g.id === guest.id ? updatedGuest : g))
+      if (selectedGuest?.id === guest.id) {
+        setSelectedGuest(updatedGuest)
+        setFormData({ ...formData, group_name: side })
+      }
+      toast.success(`Side updated to ${side}`)
+    }
+  }
+
   const handleExport = () => {
     // CSV escape function - wraps in quotes and escapes internal quotes
     const escapeCSV = (value: string | null | undefined): string => {
@@ -679,6 +698,27 @@ export default function GuestsPage() {
     }
   }
 
+  const handleBulkSide = async (side: string) => {
+    if (selectedIds.size === 0) return
+
+    const idsArray = Array.from(selectedIds)
+    const { error } = await supabase
+      .from('guests')
+      .update({ group_name: side, updated_at: new Date().toISOString() })
+      .in('id', idsArray)
+
+    if (error) {
+      toast.error('Failed to update side')
+      console.error(error)
+    } else {
+      setGuests(guests.map(g =>
+        selectedIds.has(g.id) ? { ...g, group_name: side } : g
+      ))
+      toast.success(`Updated ${selectedIds.size} guests to ${side}`)
+      clearSelection()
+    }
+  }
+
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
     if (!confirm(`Are you sure you want to delete ${selectedIds.size} guests? This cannot be undone.`)) return
@@ -781,6 +821,23 @@ export default function GuestsPage() {
                     {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
                     {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
                     {status}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Set Side
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {sideOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => handleBulkSide(option.value)}
+                  >
+                    {option.label}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -959,105 +1016,253 @@ export default function GuestsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedGuests.map((guest) => (
-                      <TableRow
-                        key={guest.id}
-                        className={cn(
-                          "cursor-pointer",
-                          selectedGuest?.id === guest.id && "bg-primary/5"
-                        )}
-                        onClick={() => handleSelectGuest(guest)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(guest.id)}
-                            onCheckedChange={() => toggleSelection(guest.id)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            getPriorityColor(guest.priority)
-                          )} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-medium text-primary">
-                                {getInitials(guest.name)}
-                              </span>
+                    {groupByFamily ? (
+                      /* Grouped Table View */
+                      groupedByFamily.map(({ family, members, key }) => (
+                        <React.Fragment key={key}>
+                          {/* Family header row */}
+                          <TableRow className="bg-muted/80 hover:bg-muted/80">
+                            <TableCell colSpan={8} className="py-2">
+                              <span className="font-semibold text-sm">{family}</span>
+                              <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                            </TableCell>
+                          </TableRow>
+                          {/* Family members */}
+                          {members.map((guest) => (
+                            <TableRow
+                              key={guest.id}
+                              className={cn(
+                                "cursor-pointer",
+                                selectedGuest?.id === guest.id && "bg-primary/5"
+                              )}
+                              onClick={() => handleSelectGuest(guest)}
+                            >
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={selectedIds.has(guest.id)}
+                                  onCheckedChange={() => toggleSelection(guest.id)}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <div className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  getPriorityColor(guest.priority)
+                                )} />
+                              </TableCell>
+                              <TableCell>
+                                <div className={cn("flex items-center gap-2", guest.is_child && "pl-6")}>
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-xs font-medium text-primary">
+                                      {getInitials(guest.name)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium">{guest.name}</span>
+                                    {guest.is_child && (
+                                      <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className="focus:outline-none text-muted-foreground hover:text-foreground">
+                                      {guest.group_name || 'Set side'}
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start">
+                                    {sideOptions.map((option) => (
+                                      <DropdownMenuItem
+                                        key={option.value}
+                                        onClick={() => handleQuickSide(guest, option.value)}
+                                      >
+                                        {option.label}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {guest.relationship || '-'}
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm">{guest.priority || '-'}</span>
+                              </TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className="focus:outline-none">
+                                      <Badge
+                                        variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                        className="capitalize cursor-pointer hover:opacity-80"
+                                      >
+                                        {guest.rsvp_status}
+                                      </Badge>
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {RSVP_OPTIONS.map((status) => (
+                                      <DropdownMenuItem
+                                        key={status}
+                                        onClick={() => handleQuickRsvp(guest, status)}
+                                        className="capitalize"
+                                      >
+                                        {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                        {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                        {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                        {status}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1.5">
+                                  {guest.dietary_restrictions && (
+                                    <span title="Has dietary restrictions">
+                                      <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
+                                    </span>
+                                  )}
+                                  {guest.address && (
+                                    <span title="Address on file">
+                                      <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                                    </span>
+                                  )}
+                                  {guest.partner_id && (
+                                    <span title="Has partner linked">
+                                      <Heart className="h-3.5 w-3.5 text-pink-500" />
+                                    </span>
+                                  )}
+                                  {guest.plus_one && (
+                                    <span title="Has plus one">
+                                      <UserPlus className="h-3.5 w-3.5 text-purple-500" />
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      /* Flat Table View */
+                      sortedGuests.map((guest) => (
+                        <TableRow
+                          key={guest.id}
+                          className={cn(
+                            "cursor-pointer",
+                            selectedGuest?.id === guest.id && "bg-primary/5"
+                          )}
+                          onClick={() => handleSelectGuest(guest)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedIds.has(guest.id)}
+                              onCheckedChange={() => toggleSelection(guest.id)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className={cn(
+                              "w-2 h-2 rounded-full",
+                              getPriorityColor(guest.priority)
+                            )} />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-medium text-primary">
+                                  {getInitials(guest.name)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium">{guest.name}</span>
+                                {guest.is_child && (
+                                  <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </div>
                             </div>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="focus:outline-none text-muted-foreground hover:text-foreground">
+                                  {guest.group_name || 'Set side'}
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                {sideOptions.map((option) => (
+                                  <DropdownMenuItem
+                                    key={option.value}
+                                    onClick={() => handleQuickSide(guest, option.value)}
+                                  >
+                                    {option.label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {guest.relationship || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{guest.priority || '-'}</span>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="focus:outline-none">
+                                  <Badge
+                                    variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                    className="capitalize cursor-pointer hover:opacity-80"
+                                  >
+                                    {guest.rsvp_status}
+                                  </Badge>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {RSVP_OPTIONS.map((status) => (
+                                  <DropdownMenuItem
+                                    key={status}
+                                    onClick={() => handleQuickRsvp(guest, status)}
+                                    className="capitalize"
+                                  >
+                                    {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                    {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                    {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                    {status}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-medium">{guest.name}</span>
-                              {guest.is_child && (
-                                <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                              {guest.dietary_restrictions && (
+                                <span title="Has dietary restrictions">
+                                  <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
+                                </span>
+                              )}
+                              {guest.address && (
+                                <span title="Address on file">
+                                  <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                                </span>
+                              )}
+                              {guest.partner_id && (
+                                <span title="Has partner linked">
+                                  <Heart className="h-3.5 w-3.5 text-pink-500" />
+                                </span>
+                              )}
+                              {guest.plus_one && (
+                                <span title="Has plus one">
+                                  <UserPlus className="h-3.5 w-3.5 text-purple-500" />
+                                </span>
                               )}
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {guest.group_name || '-'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {guest.relationship || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">{guest.priority || '-'}</span>
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="focus:outline-none">
-                                <Badge
-                                  variant={getRsvpBadgeVariant(guest.rsvp_status)}
-                                  className="capitalize cursor-pointer hover:opacity-80"
-                                >
-                                  {guest.rsvp_status}
-                                </Badge>
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {RSVP_OPTIONS.map((status) => (
-                                <DropdownMenuItem
-                                  key={status}
-                                  onClick={() => handleQuickRsvp(guest, status)}
-                                  className="capitalize"
-                                >
-                                  {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
-                                  {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
-                                  {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
-                                  {status}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            {guest.dietary_restrictions && (
-                              <span title="Has dietary restrictions">
-                                <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
-                              </span>
-                            )}
-                            {guest.address && (
-                              <span title="Address on file">
-                                <MapPin className="h-3.5 w-3.5 text-blue-500" />
-                              </span>
-                            )}
-                            {guest.partner_id && (
-                              <span title="Has partner linked">
-                                <Heart className="h-3.5 w-3.5 text-pink-500" />
-                              </span>
-                            )}
-                            {guest.plus_one && (
-                              <span title="Has plus one">
-                                <UserPlus className="h-3.5 w-3.5 text-purple-500" />
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               ) : groupByFamily ? (
