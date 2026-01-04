@@ -362,8 +362,17 @@ export default function GuestsPage() {
       }
     })
 
-    return result.sort((a, b) => a.family.localeCompare(b.family))
-  }, [sortedGuests])
+    // Sort family groups by last name, respecting sort direction
+    return result.sort((a, b) => {
+      const aLastName = getLastName(a.family.replace(' Family', ''))
+      const bLastName = getLastName(b.family.replace(' Family', ''))
+
+      if (sortBy === 'last-name-desc') {
+        return bLastName.localeCompare(aLastName)
+      }
+      return aLastName.localeCompare(bLastName)
+    })
+  }, [sortedGuests, sortBy])
 
   const handleSelectGuest = (guest: Guest) => {
     setSelectedGuest(guest)
