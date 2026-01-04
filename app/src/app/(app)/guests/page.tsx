@@ -289,24 +289,34 @@ export default function GuestsPage() {
       g.is_child && !g.parent_id
     )
 
-    // Convert to final format
-    const result: { family: string, members: Guest[] }[] = []
+    // Convert to final format - group by last name first
+    const byLastName: Record<string, { parents: Guest[], kids: Guest[] }> = {}
 
     Object.values(familyGroups).forEach(({ parents, kids }) => {
       if (parents.length === 0) return
 
       const lastName = getLastName(parents[0].name)
+
+      if (!byLastName[lastName]) {
+        byLastName[lastName] = { parents: [], kids: [] }
+      }
+
+      byLastName[lastName].parents.push(...parents)
+      byLastName[lastName].kids.push(...kids)
+    })
+
+    const result: { family: string, members: Guest[] }[] = []
+
+    Object.entries(byLastName).forEach(([lastName, { parents, kids }]) => {
       let familyName: string
 
       if (kids.length > 0) {
-        // Has kids - use "Parent1 and Parent2 LastName Family" format
-        if (parents.length === 2) {
-          const firstName1 = parents[0].name.split(' ')[0]
-          const firstName2 = parents[1].name.split(' ')[0]
-          familyName = `${firstName1} and ${firstName2} ${lastName} Family`
+        // Has kids - use parent names + "Family" format
+        const uniqueParentNames = [...new Set(parents.map(p => p.name.split(' ')[0]))]
+        if (uniqueParentNames.length >= 2) {
+          familyName = `${uniqueParentNames.slice(0, 2).join(' and ')} ${lastName} Family`
         } else {
-          const firstName = parents[0].name.split(' ')[0]
-          familyName = `${firstName} ${lastName} Family`
+          familyName = `${uniqueParentNames[0]} ${lastName} Family`
         }
       } else {
         // No kids - just use last name
@@ -703,8 +713,8 @@ export default function GuestsPage() {
               ) : groupByFamily ? (
                 /* Grouped by Family View */
                 <div>
-                  {groupedByFamily.map(({ family, members }) => (
-                    <div key={family}>
+                  {groupedByFamily.map(({ family, members }, idx) => (
+                    <div key={`${family}-${idx}`}>
                       {/* Family Header */}
                       <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
                         <span className="font-semibold text-sm">{family}</span>
