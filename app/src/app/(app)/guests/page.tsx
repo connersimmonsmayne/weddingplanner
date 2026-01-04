@@ -20,6 +20,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -43,7 +51,9 @@ import {
   Baby,
   CheckCircle2,
   Clock,
-  XCircle
+  XCircle,
+  List,
+  LayoutGrid
 } from 'lucide-react'
 import { CSVUploadDialog } from '@/components/ui/csv-upload-dialog'
 import { cn } from '@/lib/utils'
@@ -130,6 +140,7 @@ export default function GuestsPage() {
   const [saving, setSaving] = useState(false)
   const [groupByFamily, setGroupByFamily] = useState(false)
   const [showKids, setShowKids] = useState(true)
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('list')
   const [isAddingPartner, setIsAddingPartner] = useState(false)
   const [newPartnerName, setNewPartnerName] = useState('')
   const supabase = createClient()
@@ -864,6 +875,29 @@ export default function GuestsPage() {
                   Show kids
                 </Label>
               </div>
+              {/* View Toggle */}
+              <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    viewMode === 'list' ? "bg-background shadow-sm" : "hover:bg-background/50"
+                  )}
+                  title="List view"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    viewMode === 'table' ? "bg-background shadow-sm" : "hover:bg-background/50"
+                  )}
+                  title="Table view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="text-sm text-muted-foreground">
               Showing {sortedGuests.length} of {guests.length} guests
@@ -886,6 +920,116 @@ export default function GuestsPage() {
                     </Button>
                   )}
                 </div>
+              ) : viewMode === 'table' ? (
+                /* Table View */
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Side</TableHead>
+                      <TableHead>Relationship</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>RSVP</TableHead>
+                      <TableHead>Info</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedGuests.map((guest) => (
+                      <TableRow
+                        key={guest.id}
+                        className={cn(
+                          "cursor-pointer",
+                          selectedGuest?.id === guest.id && "bg-primary/5"
+                        )}
+                        onClick={() => handleSelectGuest(guest)}
+                      >
+                        <TableCell>
+                          <div className={cn(
+                            "w-2 h-2 rounded-full",
+                            getPriorityColor(guest.priority)
+                          )} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-medium text-primary">
+                                {getInitials(guest.name)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium">{guest.name}</span>
+                              {guest.is_child && (
+                                <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {guest.group_name || '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {guest.relationship || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{guest.priority || '-'}</span>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="focus:outline-none">
+                                <Badge
+                                  variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                  className="capitalize cursor-pointer hover:opacity-80"
+                                >
+                                  {guest.rsvp_status}
+                                </Badge>
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {RSVP_OPTIONS.map((status) => (
+                                <DropdownMenuItem
+                                  key={status}
+                                  onClick={() => handleQuickRsvp(guest, status)}
+                                  className="capitalize"
+                                >
+                                  {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                  {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                  {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                  {status}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            {guest.dietary_restrictions && (
+                              <span title="Has dietary restrictions">
+                                <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
+                              </span>
+                            )}
+                            {guest.address && (
+                              <span title="Address on file">
+                                <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                              </span>
+                            )}
+                            {guest.partner_id && (
+                              <span title="Has partner linked">
+                                <Heart className="h-3.5 w-3.5 text-pink-500" />
+                              </span>
+                            )}
+                            {guest.plus_one && (
+                              <span title="Has plus one">
+                                <UserPlus className="h-3.5 w-3.5 text-purple-500" />
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               ) : groupByFamily ? (
                 /* Grouped by Family View */
                 <div>
