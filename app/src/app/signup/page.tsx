@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -53,9 +54,12 @@ export default function SignupPage() {
 
   if (awaitingConfirmation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="dark min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
+            <div className="flex justify-center mb-2">
+              <Image src="/logo.svg" alt="Wedding Planner" width={48} height={48} />
+            </div>
             <CardTitle className="text-2xl">Check Your Email</CardTitle>
             <CardDescription>
               We&apos;ve sent a confirmation link to <strong>{email}</strong>
@@ -65,7 +69,7 @@ export default function SignupPage() {
             <p>Click the link in the email to confirm your account.</p>
             <p className="mt-4">Didn&apos;t receive it? Check your spam folder.</p>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
+          <CardFooter className="flex flex-col gap-4 pt-2">
             <Button variant="outline" className="w-full" onClick={() => setAwaitingConfirmation(false)}>
               Try a different email
             </Button>
@@ -79,9 +83,12 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="dark min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <div className="flex justify-center mb-2">
+            <Image src="/logo.svg" alt="Wedding Planner" width={48} height={48} />
+          </div>
           <CardTitle className="text-2xl">Create Account</CardTitle>
           <CardDescription>Start planning your perfect wedding</CardDescription>
         </CardHeader>
@@ -121,7 +128,7 @@ export default function SignupPage() {
               />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
+          <CardFooter className="flex flex-col gap-4 pt-2">
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creating account...' : 'Create Account'}
             </Button>
