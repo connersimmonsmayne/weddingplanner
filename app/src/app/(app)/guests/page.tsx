@@ -130,8 +130,8 @@ export default function GuestsPage() {
   const uniqueRelationships = [...new Set(guests.map(g => g.relationship).filter(Boolean))]
 
   const sideOptions = wedding ? [
-    { value: `${wedding.partner1_name}'s Side`, label: `${wedding.partner1_name}'s Side` },
-    { value: `${wedding.partner2_name}'s Side`, label: `${wedding.partner2_name}'s Side` },
+    { value: `${wedding.partner1_name.split(' ')[0]}'s Side`, label: `${wedding.partner1_name}'s Side` },
+    { value: `${wedding.partner2_name.split(' ')[0]}'s Side`, label: `${wedding.partner2_name}'s Side` },
     { value: 'Shared', label: 'Shared' },
   ] : []
 
@@ -141,7 +141,7 @@ export default function GuestsPage() {
       guest.notes?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesRsvp = filterRsvp === 'all' || guest.rsvp_status === filterRsvp
-    const matchesSide = filterSide === 'all' || guest.group_name === filterSide
+    const matchesSide = filterSide === 'all' || guest.group_name?.startsWith(filterSide)
     const matchesRelationship = filterRelationship === 'all' || guest.relationship === filterRelationship
 
     return matchesSearch && matchesRsvp && matchesSide && matchesRelationship
