@@ -104,6 +104,7 @@ export default function GuestsPage() {
   const [filterRsvp, setFilterRsvp] = useState<string>('all')
   const [filterSide, setFilterSide] = useState<string>('all')
   const [filterRelationship, setFilterRelationship] = useState<string>('all')
+  const [filterPriority, setFilterPriority] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('name-asc')
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -223,9 +224,10 @@ export default function GuestsPage() {
     const matchesRsvp = filterRsvp === 'all' || guest.rsvp_status === filterRsvp
     const matchesSide = filterSide === 'all' || guest.group_name?.startsWith(filterSide)
     const matchesRelationship = filterRelationship === 'all' || guest.relationship === filterRelationship
+    const matchesPriority = filterPriority === 'all' || guest.priority === filterPriority
     const matchesKids = showKids || !guest.is_child
 
-    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship && matchesKids
+    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship && matchesPriority && matchesKids
   })
 
   const sortedGuests = useMemo(() => {
@@ -724,6 +726,17 @@ export default function GuestsPage() {
                   <SelectItem value="all">All Relationships</SelectItem>
                   {uniqueRelationships.map((rel) => (
                     <SelectItem key={rel} value={rel!}>{rel}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterPriority} onValueChange={setFilterPriority}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  {PRIORITY_OPTIONS.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
