@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
 import { Guest } from '@/types/database'
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import {
@@ -80,6 +81,11 @@ function getRsvpBadgeVariant(status: string): 'success' | 'warning' | 'destructi
   }
 }
 
+function getLastName(fullName: string): string {
+  const parts = fullName.trim().split(' ')
+  return parts[parts.length - 1] || fullName
+}
+
 export default function GuestsPage() {
   const { wedding, loading: weddingLoading } = useWedding()
   const [guests, setGuests] = useState<Guest[]>([])
@@ -93,6 +99,7 @@ export default function GuestsPage() {
   const [csvDialogOpen, setCsvDialogOpen] = useState(false)
   const [formData, setFormData] = useState<GuestFormData>(emptyFormData)
   const [saving, setSaving] = useState(false)
+  const [groupByFamily, setGroupByFamily] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -130,6 +137,21 @@ export default function GuestsPage() {
 
     return matchesSearch && matchesRsvp && matchesGroup
   })
+
+  const groupedByFamily = useMemo(() => {
+    const groups: Record<string, Guest[]> = {}
+    filteredGuests.forEach(guest => {
+      const lastName = getLastName(guest.name)
+      if (!groups[lastName]) groups[lastName] = []
+      groups[lastName].push(guest)
+    })
+    return Object.entries(groups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([family, members]) => ({
+        family,
+        members: members.sort((a, b) => a.name.localeCompare(b.name))
+      }))
+  }, [filteredGuests])
 
   const handleSelectGuest = (guest: Guest) => {
     setSelectedGuest(guest)
@@ -372,6 +394,16 @@ export default function GuestsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="group-by-family"
+                checked={groupByFamily}
+                onCheckedChange={setGroupByFamily}
+              />
+              <Label htmlFor="group-by-family" className="text-sm text-muted-foreground cursor-pointer">
+                Group by family
+              </Label>
+            </div>
           </div>
 
           {/* Guest List */}
@@ -390,7 +422,52 @@ export default function GuestsPage() {
                     </Button>
                   )}
                 </div>
+              ) : groupByFamily ? (
+                /* Grouped by Family View */
+                <div>
+                  {groupedByFamily.map(({ family, members }) => (
+                    <div key={family}>
+                      {/* Family Header */}
+                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
+                        <span className="font-semibold text-sm">{family}</span>
+                        <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                      </div>
+                      {/* Family Members */}
+                      <div className="divide-y">
+                        {members.map((guest) => (
+                          <button
+                            key={guest.id}
+                            onClick={() => handleSelectGuest(guest)}
+                            className={cn(
+                              "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
+                              selectedGuest?.id === guest.id && "bg-primary/5"
+                            )}
+                          >
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-sm font-medium text-primary">
+                                {getInitials(guest.name)}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{guest.name}</div>
+                              <div className="text-sm text-muted-foreground truncate">
+                                {guest.group_name || guest.relationship || 'No group'}
+                              </div>
+                            </div>
+                            <Badge
+                              variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                              className="capitalize flex-shrink-0"
+                            >
+                              {guest.rsvp_status}
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
+                /* Flat List View */
                 <div className="divide-y">
                   {filteredGuests.map((guest) => (
                     <button
