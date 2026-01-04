@@ -229,7 +229,8 @@ export default function GuestsPage() {
     return [...filteredGuests].sort((a, b) => {
       switch (sortBy) {
         case 'name-desc': return b.name.localeCompare(a.name)
-        case 'last-name': return getLastName(a.name).localeCompare(getLastName(b.name))
+        case 'last-name-asc': return getLastName(a.name).localeCompare(getLastName(b.name))
+        case 'last-name-desc': return getLastName(b.name).localeCompare(getLastName(a.name))
         case 'rsvp':
           const order: Record<string, number> = { confirmed: 0, pending: 1, declined: 2 }
           return order[a.rsvp_status] - order[b.rsvp_status]
@@ -638,9 +639,10 @@ export default function GuestsPage() {
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-                  <SelectItem value="last-name">Last Name</SelectItem>
+                  <SelectItem value="name-asc">First Name (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">First Name (Z-A)</SelectItem>
+                  <SelectItem value="last-name-asc">Last Name (A-Z)</SelectItem>
+                  <SelectItem value="last-name-desc">Last Name (Z-A)</SelectItem>
                   <SelectItem value="rsvp">RSVP Status</SelectItem>
                 </SelectContent>
               </Select>
