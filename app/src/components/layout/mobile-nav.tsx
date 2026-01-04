@@ -29,14 +29,13 @@ const navItems = [
   { href: '/budget', label: 'Budget', icon: Wallet },
   { href: '/vendors', label: 'Vendors', icon: Store },
   { href: '/timeline', label: 'Timeline', icon: Calendar },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const weddingId = searchParams.get('wedding')
-  const { wedding } = useWedding()
+  const { wedding, weddingCount } = useWedding()
 
   const [isOpen, setIsOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -175,14 +174,32 @@ export function MobileNav() {
 
         {/* Bottom Section */}
         <div className="border-t border-sidebar-border p-3 space-y-1">
+          {/* Settings */}
           <Link
-            href="/select"
+            href={`/settings?wedding=${weddingId}`}
             onClick={() => setIsOpen(false)}
-            className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-150"
+            className={cn(
+              "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-150",
+              pathname.startsWith('/settings')
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+            )}
           >
-            <LogOut className="h-5 w-5" />
-            <span>Switch Wedding</span>
+            <Settings className={cn("h-5 w-5", pathname.startsWith('/settings') && "text-primary-foreground")} />
+            <span>Settings</span>
           </Link>
+
+          {/* Switch Wedding - only show if user has multiple weddings */}
+          {weddingCount > 1 && (
+            <Link
+              href="/select"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-150"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Switch Wedding</span>
+            </Link>
+          )}
 
           {/* Dark Mode Toggle */}
           <button
