@@ -251,9 +251,10 @@ export default function GuestsPage() {
       }
     })
 
-    // Build family groups using partner_id relationships
-    const familyGroups: Record<string, { parents: Guest[], kids: Guest[] }> = {}
+    // Build family groups using ONLY partner_id relationships
+    const result: { family: string, members: Guest[], key: string }[] = []
     const processedAdults = new Set<string>()
+    const processedKids = new Set<string>()
 
     // Group adults by partner relationships
     sortedGuests.forEach(guest => {
@@ -266,83 +267,57 @@ export default function GuestsPage() {
 
       const parents = partner ? [guest, partner] : [guest]
 
-      // Collect kids from both parents
+      // Collect kids linked to either parent
       const allKids: Guest[] = []
       parents.forEach(parent => {
         const kids = parentToChildren[parent.id] || []
         kids.forEach(kid => {
           if (!allKids.find(k => k.id === kid.id)) {
             allKids.push(kid)
+            processedKids.add(kid.id)
           }
         })
       })
 
-      const groupKey = guest.id + (partner ? `-${partner.id}` : '')
-      familyGroups[groupKey] = { parents, kids: allKids }
+      // Build family name based on relationships
+      const lastName = getLastName(parents[0].name)
+      let familyName: string
+
+      if (allKids.length > 0) {
+        // Has kids - use "Parent1 and Parent2 LastName Family" format
+        if (parents.length === 2) {
+          const firstName1 = parents[0].name.split(' ')[0]
+          const firstName2 = parents[1].name.split(' ')[0]
+          familyName = `${firstName1} and ${firstName2} ${lastName} Family`
+        } else {
+          familyName = `${parents[0].name} Family`
+        }
+      } else if (parents.length === 2) {
+        // Couple without kids
+        const firstName1 = parents[0].name.split(' ')[0]
+        const firstName2 = parents[1].name.split(' ')[0]
+        familyName = `${firstName1} and ${firstName2} ${lastName}`
+      } else {
+        // Single adult - just their name
+        familyName = guest.name
+      }
+
+      const members = [...parents, ...allKids]
+      const key = guest.id + (partner ? `-${partner.id}` : '')
+      result.push({ family: familyName, members, key })
 
       processedAdults.add(guest.id)
       if (partner) processedAdults.add(partner.id)
     })
 
-    // Add remaining kids without parent links to last-name groups
-    const orphanKids = sortedGuests.filter(g =>
-      g.is_child && !g.parent_id
-    )
-
-    // Convert to final format - group by last name first
-    const byLastName: Record<string, { parents: Guest[], kids: Guest[] }> = {}
-
-    Object.values(familyGroups).forEach(({ parents, kids }) => {
-      if (parents.length === 0) return
-
-      const lastName = getLastName(parents[0].name)
-
-      if (!byLastName[lastName]) {
-        byLastName[lastName] = { parents: [], kids: [] }
-      }
-
-      byLastName[lastName].parents.push(...parents)
-      byLastName[lastName].kids.push(...kids)
-    })
-
-    const result: { family: string, members: Guest[] }[] = []
-
-    Object.entries(byLastName).forEach(([lastName, { parents, kids }]) => {
-      let familyName: string
-
-      if (kids.length > 0) {
-        // Has kids - use parent names + "Family" format
-        const uniqueParentNames = [...new Set(parents.map(p => p.name.split(' ')[0]))]
-        if (uniqueParentNames.length >= 2) {
-          familyName = `${uniqueParentNames.slice(0, 2).join(' and ')} ${lastName} Family`
-        } else {
-          familyName = `${uniqueParentNames[0]} ${lastName} Family`
-        }
-      } else {
-        // No kids - just use last name
-        familyName = lastName
-      }
-
-      // Sort: adults first, kids at bottom
-      const members = [...parents, ...kids]
-      result.push({ family: familyName, members })
-    })
-
-    // Add orphan kids grouped by last name
-    const orphansByLastName: Record<string, Guest[]> = {}
-    orphanKids.forEach(kid => {
-      const lastName = getLastName(kid.name)
-      if (!orphansByLastName[lastName]) orphansByLastName[lastName] = []
-      orphansByLastName[lastName].push(kid)
-    })
-
-    Object.entries(orphansByLastName).forEach(([lastName, kids]) => {
-      // Check if there's already a family group with this last name
-      const existingGroup = result.find(g => g.family.includes(lastName))
-      if (existingGroup) {
-        existingGroup.members.push(...kids)
-      } else {
-        result.push({ family: lastName, members: kids })
+    // Add unlinked kids as individuals
+    sortedGuests.forEach(guest => {
+      if (guest.is_child && !processedKids.has(guest.id)) {
+        result.push({
+          family: guest.name,
+          members: [guest],
+          key: guest.id
+        })
       }
     })
 
@@ -713,8 +688,8 @@ export default function GuestsPage() {
               ) : groupByFamily ? (
                 /* Grouped by Family View */
                 <div>
-                  {groupedByFamily.map(({ family, members }, idx) => (
-                    <div key={`${family}-${idx}`}>
+                  {groupedByFamily.map(({ family, members, key }) => (
+                    <div key={key}>
                       {/* Family Header */}
                       <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
                         <span className="font-semibold text-sm">{family}</span>
