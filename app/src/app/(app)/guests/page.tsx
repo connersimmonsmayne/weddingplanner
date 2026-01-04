@@ -702,22 +702,7 @@ export default function GuestsPage() {
     }
   }
 
-  if (weddingLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-pulse text-muted-foreground">Loading guests...</div>
-      </div>
-    )
-  }
-
-  if (!wedding) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">No wedding selected</p>
-      </div>
-    )
-  }
-
+  // Stats calculation - must be before early returns (Rules of Hooks)
   const stats = useMemo(() => {
     const total = guests.length
     const adults = guests.filter(g => !g.is_child).length
@@ -745,6 +730,22 @@ export default function GuestsPage() {
   }, [guests])
 
   const showDetailPanel = selectedGuest || isCreating
+
+  if (weddingLoading || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse text-muted-foreground">Loading guests...</div>
+      </div>
+    )
+  }
+
+  if (!wedding) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">No wedding selected</p>
+      </div>
+    )
+  }
 
   return (
     <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col">
