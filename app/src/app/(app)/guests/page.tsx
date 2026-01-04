@@ -92,7 +92,9 @@ export default function GuestsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRsvp, setFilterRsvp] = useState<string>('all')
-  const [filterGroup, setFilterGroup] = useState<string>('all')
+  const [filterSide, setFilterSide] = useState<string>('all')
+  const [filterRelationship, setFilterRelationship] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('name-asc')
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -125,7 +127,13 @@ export default function GuestsPage() {
     setLoading(false)
   }
 
-  const uniqueGroups = [...new Set(guests.map(g => g.group_name).filter(Boolean))]
+  const uniqueRelationships = [...new Set(guests.map(g => g.relationship).filter(Boolean))]
+
+  const sideOptions = wedding ? [
+    { value: `${wedding.partner1_name}'s Side`, label: `${wedding.partner1_name}'s Side` },
+    { value: `${wedding.partner2_name}'s Side`, label: `${wedding.partner2_name}'s Side` },
+    { value: 'Shared', label: 'Shared' },
+  ] : []
 
   const filteredGuests = guests.filter(guest => {
     const matchesSearch = guest.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -133,14 +141,28 @@ export default function GuestsPage() {
       guest.notes?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesRsvp = filterRsvp === 'all' || guest.rsvp_status === filterRsvp
-    const matchesGroup = filterGroup === 'all' || guest.group_name === filterGroup
+    const matchesSide = filterSide === 'all' || guest.group_name === filterSide
+    const matchesRelationship = filterRelationship === 'all' || guest.relationship === filterRelationship
 
-    return matchesSearch && matchesRsvp && matchesGroup
+    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship
   })
+
+  const sortedGuests = useMemo(() => {
+    return [...filteredGuests].sort((a, b) => {
+      switch (sortBy) {
+        case 'name-desc': return b.name.localeCompare(a.name)
+        case 'last-name': return getLastName(a.name).localeCompare(getLastName(b.name))
+        case 'rsvp':
+          const order: Record<string, number> = { confirmed: 0, pending: 1, declined: 2 }
+          return order[a.rsvp_status] - order[b.rsvp_status]
+        default: return a.name.localeCompare(b.name) // name-asc
+      }
+    })
+  }, [filteredGuests, sortBy])
 
   const groupedByFamily = useMemo(() => {
     const groups: Record<string, Guest[]> = {}
-    filteredGuests.forEach(guest => {
+    sortedGuests.forEach(guest => {
       const lastName = getLastName(guest.name)
       if (!groups[lastName]) groups[lastName] = []
       groups[lastName].push(guest)
@@ -149,9 +171,9 @@ export default function GuestsPage() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([family, members]) => ({
         family,
-        members: members.sort((a, b) => a.name.localeCompare(b.name))
+        members // Keep the sorted order from sortedGuests
       }))
-  }, [filteredGuests])
+  }, [sortedGuests])
 
   const handleSelectGuest = (guest: Guest) => {
     setSelectedGuest(guest)
@@ -382,34 +404,58 @@ export default function GuestsPage() {
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterGroup} onValueChange={setFilterGroup}>
+              <Select value={filterSide} onValueChange={setFilterSide}>
                 <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Group" />
+                  <SelectValue placeholder="Side" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Groups</SelectItem>
-                  {uniqueGroups.map((group) => (
-                    <SelectItem key={group} value={group!}>{group}</SelectItem>
+                  <SelectItem value="all">All Sides</SelectItem>
+                  {sideOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterRelationship} onValueChange={setFilterRelationship}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Relationship" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Relationships</SelectItem>
+                  {uniqueRelationships.map((rel) => (
+                    <SelectItem key={rel} value={rel!}>{rel}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="group-by-family"
-                checked={groupByFamily}
-                onCheckedChange={setGroupByFamily}
-              />
-              <Label htmlFor="group-by-family" className="text-sm text-muted-foreground cursor-pointer">
-                Group by family
-              </Label>
+            <div className="flex items-center gap-3">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                  <SelectItem value="last-name">Last Name</SelectItem>
+                  <SelectItem value="rsvp">RSVP Status</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="group-by-family"
+                  checked={groupByFamily}
+                  onCheckedChange={setGroupByFamily}
+                />
+                <Label htmlFor="group-by-family" className="text-sm text-muted-foreground cursor-pointer">
+                  Group by family
+                </Label>
+              </div>
             </div>
           </div>
 
           {/* Guest List */}
           <Card className="flex-1 overflow-hidden">
             <CardContent className="p-0 h-full overflow-y-auto">
-              {filteredGuests.length === 0 ? (
+              {sortedGuests.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Users className="h-12 w-12 text-muted-foreground/50 mb-3" />
                   <p className="text-muted-foreground">
@@ -451,7 +497,7 @@ export default function GuestsPage() {
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">{guest.name}</div>
                               <div className="text-sm text-muted-foreground truncate">
-                                {guest.group_name || guest.relationship || 'No group'}
+                                {guest.relationship || guest.group_name || 'No info'}
                               </div>
                             </div>
                             <Badge
@@ -469,7 +515,7 @@ export default function GuestsPage() {
               ) : (
                 /* Flat List View */
                 <div className="divide-y">
-                  {filteredGuests.map((guest) => (
+                  {sortedGuests.map((guest) => (
                     <button
                       key={guest.id}
                       onClick={() => handleSelectGuest(guest)}
@@ -552,13 +598,20 @@ export default function GuestsPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="group">Group</Label>
-                      <Input
-                        id="group"
-                        value={formData.group_name}
-                        onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-                        placeholder="e.g., Bride's Family"
-                      />
+                      <Label htmlFor="side">Side</Label>
+                      <Select
+                        value={formData.group_name || ''}
+                        onValueChange={(value) => setFormData({ ...formData, group_name: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select side" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sideOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="relationship">Relationship</Label>
@@ -709,7 +762,7 @@ export default function GuestsPage() {
                       <div className="flex items-start gap-3">
                         <Tag className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Group</p>
+                          <p className="text-sm text-muted-foreground">Side</p>
                           <p className="font-medium">{selectedGuest.group_name}</p>
                         </div>
                       </div>
