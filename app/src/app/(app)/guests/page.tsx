@@ -1020,13 +1020,15 @@ export default function GuestsPage() {
                       /* Grouped Table View */
                       groupedByFamily.map(({ family, members, key }) => (
                         <React.Fragment key={key}>
-                          {/* Family header row */}
-                          <TableRow className="bg-muted/80 hover:bg-muted/80">
-                            <TableCell colSpan={8} className="py-2">
-                              <span className="font-semibold text-sm">{family}</span>
-                              <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
-                            </TableCell>
-                          </TableRow>
+                          {/* Family header row - only show if more than 1 member */}
+                          {members.length > 1 && (
+                            <TableRow className="bg-muted/80 hover:bg-muted/80">
+                              <TableCell colSpan={8} className="py-2">
+                                <span className="font-semibold text-sm">{family}</span>
+                                <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                              </TableCell>
+                            </TableRow>
+                          )}
                           {/* Family members */}
                           {members.map((guest) => (
                             <TableRow
@@ -1270,11 +1272,13 @@ export default function GuestsPage() {
                 <div>
                   {groupedByFamily.map(({ family, members, key }) => (
                     <div key={key}>
-                      {/* Family Header */}
-                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
-                        <span className="font-semibold text-sm">{family}</span>
-                        <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
-                      </div>
+                      {/* Family Header - only show if more than 1 member */}
+                      {members.length > 1 && (
+                        <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
+                          <span className="font-semibold text-sm">{family}</span>
+                          <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                        </div>
+                      )}
                       {/* Family Members */}
                       <div className="divide-y">
                         {members.map((guest) => (
