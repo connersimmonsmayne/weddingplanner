@@ -405,6 +405,7 @@ export default function GuestsPage() {
       const { data, error } = await supabase
         .from('guests')
         .insert({
+          id: crypto.randomUUID(),
           ...dataToSave,
           wedding_id: wedding.id,
         })
