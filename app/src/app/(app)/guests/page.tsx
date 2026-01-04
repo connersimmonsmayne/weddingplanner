@@ -19,6 +19,12 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -88,6 +94,15 @@ function getRsvpBadgeVariant(status: string): 'success' | 'warning' | 'destructi
     case 'confirmed': return 'success'
     case 'declined': return 'destructive'
     default: return 'warning'
+  }
+}
+
+function getPriorityColor(priority: string | null): string {
+  switch (priority) {
+    case 'Must Invite': return 'bg-green-500'
+    case 'Like to Invite': return 'bg-yellow-500'
+    case 'Maybe': return 'bg-gray-400'
+    default: return 'bg-gray-300'
   }
 }
 
@@ -809,44 +824,101 @@ export default function GuestsPage() {
                       {/* Family Members */}
                       <div className="divide-y">
                         {members.map((guest) => (
-                          <button
+                          <div
                             key={guest.id}
-                            onClick={() => handleSelectGuest(guest)}
                             className={cn(
-                              "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
+                              "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors min-w-0",
                               selectedGuest?.id === guest.id && "bg-primary/5",
                               guest.is_child && "pl-8"
                             )}
                           >
-                            <div className={cn(
-                              "flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center",
-                              guest.is_child ? "w-8 h-8" : "w-10 h-10"
-                            )}>
-                              <span className={cn(
-                                "font-medium text-primary",
-                                guest.is_child ? "text-xs" : "text-sm"
+                            {/* Clickable area for guest selection */}
+                            <button
+                              onClick={() => handleSelectGuest(guest)}
+                              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                            >
+                              {/* Priority dot */}
+                              <div className={cn(
+                                "w-2 h-2 rounded-full flex-shrink-0",
+                                getPriorityColor(guest.priority)
+                              )} title={guest.priority || 'No priority'} />
+
+                              <div className={cn(
+                                "flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center",
+                                guest.is_child ? "w-8 h-8" : "w-10 h-10"
                               )}>
-                                {getInitials(guest.name)}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate flex items-center gap-1.5">
-                                {guest.name}
-                                {guest.is_child && (
-                                  <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <span className={cn(
+                                  "font-medium text-primary",
+                                  guest.is_child ? "text-xs" : "text-sm"
+                                )}>
+                                  {getInitials(guest.name)}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate flex items-center gap-1.5">
+                                  {guest.name}
+                                  {guest.is_child && (
+                                    <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground truncate">
+                                  {guest.relationship || guest.group_name || 'No info'}
+                                </div>
+                              </div>
+
+                              {/* Indicator icons */}
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {guest.dietary_restrictions && (
+                                  <span title="Has dietary restrictions">
+                                    <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
+                                  </span>
+                                )}
+                                {guest.address && (
+                                  <span title="Address on file">
+                                    <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                                  </span>
+                                )}
+                                {guest.partner_id && (
+                                  <span title="Has partner linked">
+                                    <Heart className="h-3.5 w-3.5 text-pink-500" />
+                                  </span>
+                                )}
+                                {guest.plus_one && (
+                                  <span title="Has plus one">
+                                    <UserPlus className="h-3.5 w-3.5 text-purple-500" />
+                                  </span>
                                 )}
                               </div>
-                              <div className="text-sm text-muted-foreground truncate">
-                                {guest.relationship || guest.group_name || 'No info'}
-                              </div>
-                            </div>
-                            <Badge
-                              variant={getRsvpBadgeVariant(guest.rsvp_status)}
-                              className="capitalize flex-shrink-0"
-                            >
-                              {guest.rsvp_status}
-                            </Badge>
-                          </button>
+                            </button>
+
+                            {/* Inline RSVP Dropdown */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="focus:outline-none">
+                                  <Badge
+                                    variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                    className="capitalize flex-shrink-0 cursor-pointer hover:opacity-80"
+                                  >
+                                    {guest.rsvp_status}
+                                  </Badge>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {RSVP_OPTIONS.map((status) => (
+                                  <DropdownMenuItem
+                                    key={status}
+                                    onClick={() => handleQuickRsvp(guest, status)}
+                                    className="capitalize"
+                                  >
+                                    {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                    {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                    {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                    {status}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -856,42 +928,97 @@ export default function GuestsPage() {
                 /* Flat List View */
                 <div className="divide-y">
                   {sortedGuests.map((guest) => (
-                    <button
+                    <div
                       key={guest.id}
-                      onClick={() => handleSelectGuest(guest)}
                       className={cn(
-                        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
+                        "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors min-w-0",
                         selectedGuest?.id === guest.id && "bg-primary/5"
                       )}
                     >
-                      {/* Avatar */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary">
-                          {getInitials(guest.name)}
-                        </span>
-                      </div>
+                      {/* Clickable area for guest selection */}
+                      <button
+                        onClick={() => handleSelectGuest(guest)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        {/* Priority dot */}
+                        <div className={cn(
+                          "w-2 h-2 rounded-full flex-shrink-0",
+                          getPriorityColor(guest.priority)
+                        )} title={guest.priority || 'No priority'} />
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate flex items-center gap-1.5">
-                          {guest.name}
-                          {guest.is_child && (
-                            <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        {/* Avatar */}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-sm font-medium text-primary">
+                            {getInitials(guest.name)}
+                          </span>
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate flex items-center gap-1.5">
+                            {guest.name}
+                            {guest.is_child && (
+                              <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            {guest.group_name || guest.relationship || 'No group'}
+                          </div>
+                        </div>
+
+                        {/* Indicator icons */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {guest.dietary_restrictions && (
+                            <span title="Has dietary restrictions">
+                              <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
+                            </span>
+                          )}
+                          {guest.address && (
+                            <span title="Address on file">
+                              <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                            </span>
+                          )}
+                          {guest.partner_id && (
+                            <span title="Has partner linked">
+                              <Heart className="h-3.5 w-3.5 text-pink-500" />
+                            </span>
+                          )}
+                          {guest.plus_one && (
+                            <span title="Has plus one">
+                              <UserPlus className="h-3.5 w-3.5 text-purple-500" />
+                            </span>
                           )}
                         </div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {guest.group_name || guest.relationship || 'No group'}
-                        </div>
-                      </div>
+                      </button>
 
-                      {/* RSVP Badge */}
-                      <Badge
-                        variant={getRsvpBadgeVariant(guest.rsvp_status)}
-                        className="capitalize flex-shrink-0"
-                      >
-                        {guest.rsvp_status}
-                      </Badge>
-                    </button>
+                      {/* Inline RSVP Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="focus:outline-none">
+                            <Badge
+                              variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                              className="capitalize flex-shrink-0 cursor-pointer hover:opacity-80"
+                            >
+                              {guest.rsvp_status}
+                            </Badge>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {RSVP_OPTIONS.map((status) => (
+                            <DropdownMenuItem
+                              key={status}
+                              onClick={() => handleQuickRsvp(guest, status)}
+                              className="capitalize"
+                            >
+                              {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                              {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                              {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                              {status}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   ))}
                 </div>
               )}
