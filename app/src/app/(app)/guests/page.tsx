@@ -1797,23 +1797,6 @@ export default function GuestsPage() {
           </Card>
         )}
 
-        {/* Empty State - No selection on desktop */}
-        {!showDetailPanel && (
-          <div className="hidden lg:flex flex-1 items-center justify-center">
-            <Card className="w-full max-w-md">
-              <CardContent className="py-12 text-center">
-                <Users className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Select a guest from the list to view their details
-                </p>
-                <Button onClick={handleStartCreate}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Guest
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   )
