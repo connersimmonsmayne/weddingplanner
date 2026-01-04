@@ -33,7 +33,10 @@ import {
   Tag,
   Heart,
   Trash2,
-  Baby
+  Baby,
+  CheckCircle2,
+  Clock,
+  XCircle
 } from 'lucide-react'
 import { CSVUploadDialog } from '@/components/ui/csv-upload-dialog'
 import { cn } from '@/lib/utils'
@@ -544,12 +547,31 @@ export default function GuestsPage() {
     )
   }
 
-  const stats = {
-    total: guests.length,
-    confirmed: guests.filter(g => g.rsvp_status === 'confirmed').length,
-    pending: guests.filter(g => g.rsvp_status === 'pending').length,
-    declined: guests.filter(g => g.rsvp_status === 'declined').length,
-  }
+  const stats = useMemo(() => {
+    const total = guests.length
+    const adults = guests.filter(g => !g.is_child).length
+    const kids = guests.filter(g => g.is_child).length
+    const confirmed = guests.filter(g => g.rsvp_status === 'confirmed').length
+    const pending = guests.filter(g => g.rsvp_status === 'pending').length
+    const declined = guests.filter(g => g.rsvp_status === 'declined').length
+    const responded = confirmed + declined
+    const responseRate = total > 0 ? Math.round((responded / total) * 100) : 0
+    const withAddress = guests.filter(g => g.address && g.address.trim()).length
+    const withDietary = guests.filter(g => g.dietary_restrictions && g.dietary_restrictions.trim()).length
+
+    return {
+      total,
+      adults,
+      kids,
+      confirmed,
+      pending,
+      declined,
+      responded,
+      responseRate,
+      withAddress,
+      withDietary,
+    }
+  }, [guests])
 
   const showDetailPanel = selectedGuest || isCreating
 
@@ -579,6 +601,79 @@ export default function GuestsPage() {
         existingGuests={guests.map(g => ({ name: g.name }))}
         onSuccess={fetchGuests}
       />
+
+      {/* Stats Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {/* Total Guests */}
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-semibold">{stats.total}</p>
+              <p className="text-xs text-muted-foreground">
+                {stats.adults} adults • {stats.kids} kids
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* RSVP Progress */}
+        <Card className="p-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">RSVP Progress</span>
+              <span className="text-sm text-muted-foreground">{stats.responseRate}%</span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${stats.responseRate}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.responded} of {stats.total} responded
+            </p>
+          </div>
+        </Card>
+
+        {/* RSVP Breakdown */}
+        <Card className="p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <span className="text-sm font-medium">{stats.confirmed}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-yellow-500" />
+              <span className="text-sm font-medium">{stats.pending}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <XCircle className="h-4 w-4 text-red-500" />
+              <span className="text-sm font-medium">{stats.declined}</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Confirmed • Pending • Declined
+          </p>
+        </Card>
+
+        {/* Addresses Collected */}
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-semibold">{stats.withAddress}</p>
+              <p className="text-xs text-muted-foreground">
+                addresses collected
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       {/* Main Content - List + Detail Layout */}
       <div className="flex-1 flex gap-6 min-h-0 overflow-hidden min-w-0">
