@@ -229,7 +229,8 @@ export default function GuestsPage() {
     return [...filteredGuests].sort((a, b) => {
       switch (sortBy) {
         case 'name-desc': return b.name.localeCompare(a.name)
-        case 'last-name': return getLastName(a.name).localeCompare(getLastName(b.name))
+        case 'last-name-asc': return getLastName(a.name).localeCompare(getLastName(b.name))
+        case 'last-name-desc': return getLastName(b.name).localeCompare(getLastName(a.name))
         case 'rsvp':
           const order: Record<string, number> = { confirmed: 0, pending: 1, declined: 2 }
           return order[a.rsvp_status] - order[b.rsvp_status]
@@ -405,6 +406,7 @@ export default function GuestsPage() {
       const { data, error } = await supabase
         .from('guests')
         .insert({
+          id: crypto.randomUUID(),
           ...dataToSave,
           wedding_id: wedding.id,
         })
@@ -637,9 +639,10 @@ export default function GuestsPage() {
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-                  <SelectItem value="last-name">Last Name</SelectItem>
+                  <SelectItem value="name-asc">First Name (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">First Name (Z-A)</SelectItem>
+                  <SelectItem value="last-name-asc">Last Name (A-Z)</SelectItem>
+                  <SelectItem value="last-name-desc">Last Name (Z-A)</SelectItem>
                   <SelectItem value="rsvp">RSVP Status</SelectItem>
                 </SelectContent>
               </Select>
@@ -798,7 +801,16 @@ export default function GuestsPage() {
                   {isCreating ? 'New Guest' : (isEditing ? 'Edit Guest' : 'Guest Details')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {!isCreating && !isEditing && selectedGuest && (
+                  {(isEditing || isCreating) ? (
+                    <>
+                      <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={handleSave} disabled={saving}>
+                        {saving ? 'Saving...' : (isCreating ? 'Add Guest' : 'Save')}
+                      </Button>
+                    </>
+                  ) : selectedGuest && (
                     <>
                       <Button variant="outline" size="sm" onClick={handleStartEdit}>
                         Edit
@@ -881,6 +893,17 @@ export default function GuestsPage() {
                             disabled={!newPartnerName.trim()}
                             onClick={async () => {
                               if (!wedding?.id || !newPartnerName.trim()) return
+
+                              // Check for duplicate name
+                              const existingGuest = guests.find(
+                                g => g.name.toLowerCase() === newPartnerName.trim().toLowerCase()
+                              )
+                              if (existingGuest) {
+                                if (!confirm(`A guest named "${newPartnerName.trim()}" already exists. Create anyway?`)) {
+                                  return
+                                }
+                              }
+
                               // Create new partner guest
                               const { data: newPartner, error } = await supabase
                                 .from('guests')
@@ -935,18 +958,18 @@ export default function GuestsPage() {
                             <SelectValue placeholder="Select partner (optional)" />
                           </SelectTrigger>
                           <SelectContent>
-                            {selectedGuest?.id && getPartnerOptions(selectedGuest.id, formData.name).map((adult) => (
-                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
-                            ))}
-                            {!selectedGuest?.id && getPartnerOptions('', formData.name).map((adult) => (
-                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
-                            ))}
                             <SelectItem value="__add_new__" className="text-primary">
                               <span className="flex items-center gap-2">
                                 <Plus className="h-4 w-4" />
                                 Add new partner
                               </span>
                             </SelectItem>
+                            {selectedGuest?.id && getPartnerOptions(selectedGuest.id, formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
+                            {!selectedGuest?.id && getPartnerOptions('', formData.name).map((adult) => (
+                              <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       )}
@@ -1060,14 +1083,6 @@ export default function GuestsPage() {
                     />
                   </div>
 
-                  <div className="flex gap-3 pt-4">
-                    <Button variant="outline" className="flex-1" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                    <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                      {saving ? 'Saving...' : (isCreating ? 'Add Guest' : 'Save Changes')}
-                    </Button>
-                  </div>
                 </div>
               ) : selectedGuest ? (
                 /* View Mode */
