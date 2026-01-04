@@ -39,7 +39,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const weddingId = searchParams.get('wedding')
-  const { wedding } = useWedding()
+  const { wedding, weddingCount } = useWedding()
 
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -174,20 +174,22 @@ export function Sidebar() {
             )
           })}
 
-          {/* Switch Wedding */}
-          <Link
-            href="/select"
-            onClick={handleNavClick}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
-              "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-              isCollapsed && "justify-center px-2"
-            )}
-            title={isCollapsed ? "Switch Wedding" : undefined}
-          >
-            <LogOut className="h-5 w-5 flex-shrink-0" />
-            {!isCollapsed && <span>Switch Wedding</span>}
-          </Link>
+          {/* Switch Wedding - only show if user has multiple weddings */}
+          {weddingCount > 1 && (
+            <Link
+              href="/select"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+                "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
+                isCollapsed && "justify-center px-2"
+              )}
+              title={isCollapsed ? "Switch Wedding" : undefined}
+            >
+              <LogOut className="h-5 w-5 flex-shrink-0" />
+              {!isCollapsed && <span>Switch Wedding</span>}
+            </Link>
+          )}
 
           {/* Dark Mode Toggle */}
           <button

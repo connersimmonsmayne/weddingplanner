@@ -10,6 +10,7 @@ interface WeddingContextType {
   membership: WeddingMember | null
   isAdmin: boolean
   loading: boolean
+  weddingCount: number
   refreshWedding: () => Promise<void>
 }
 
@@ -18,6 +19,7 @@ const WeddingContext = createContext<WeddingContextType>({
   membership: null,
   isAdmin: false,
   loading: true,
+  weddingCount: 0,
   refreshWedding: async () => {},
 })
 
@@ -39,6 +41,7 @@ export function WeddingProvider({
   const [wedding, setWedding] = useState<Wedding | null>(initialWedding)
   const [membership, setMembership] = useState<WeddingMember | null>(initialMembership)
   const [loading, setLoading] = useState(!initialWedding)
+  const [weddingCount, setWeddingCount] = useState(0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
@@ -84,6 +87,13 @@ export function WeddingProvider({
       return
     }
 
+    // Get count of all weddings user belongs to
+    const { count } = await supabase
+      .from('wedding_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+
+    setWeddingCount(count || 0)
     setMembership(membershipData)
     setWedding(weddingData)
     setLoading(false)
@@ -105,6 +115,7 @@ export function WeddingProvider({
       membership,
       isAdmin: membership?.role === 'admin',
       loading,
+      weddingCount,
       refreshWedding,
     }}>
       {children}
