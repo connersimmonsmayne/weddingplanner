@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, Fragment } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
 import { Guest } from '@/types/database'
@@ -18,13 +18,35 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 import {
   Plus,
   Search,
   Users,
   Upload,
+  Download,
   X,
   Mail,
   MapPin,
@@ -33,7 +55,12 @@ import {
   Tag,
   Heart,
   Trash2,
-  Baby
+  Baby,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  List,
+  LayoutGrid
 } from 'lucide-react'
 import { CSVUploadDialog } from '@/components/ui/csv-upload-dialog'
 import { cn } from '@/lib/utils'
@@ -88,6 +115,15 @@ function getRsvpBadgeVariant(status: string): 'success' | 'warning' | 'destructi
   }
 }
 
+function getPriorityColor(priority: string | null): string {
+  switch (priority) {
+    case 'Must Invite': return 'bg-green-500'
+    case 'Like to Invite': return 'bg-yellow-500'
+    case 'Maybe': return 'bg-gray-400'
+    default: return 'bg-gray-300'
+  }
+}
+
 function getLastName(fullName: string): string {
   const parts = fullName.trim().split(' ')
   return parts[parts.length - 1] || fullName
@@ -101,15 +137,18 @@ export default function GuestsPage() {
   const [filterRsvp, setFilterRsvp] = useState<string>('all')
   const [filterSide, setFilterSide] = useState<string>('all')
   const [filterRelationship, setFilterRelationship] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<string>('name-asc')
+  const [filterPriority, setFilterPriority] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('last-name-asc')
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [csvDialogOpen, setCsvDialogOpen] = useState(false)
   const [formData, setFormData] = useState<GuestFormData>(emptyFormData)
   const [saving, setSaving] = useState(false)
-  const [groupByFamily, setGroupByFamily] = useState(false)
+  const [groupByFamily, setGroupByFamily] = useState(true)
   const [showKids, setShowKids] = useState(true)
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('table')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isAddingPartner, setIsAddingPartner] = useState(false)
   const [newPartnerName, setNewPartnerName] = useState('')
   const supabase = createClient()
@@ -220,9 +259,10 @@ export default function GuestsPage() {
     const matchesRsvp = filterRsvp === 'all' || guest.rsvp_status === filterRsvp
     const matchesSide = filterSide === 'all' || guest.group_name?.startsWith(filterSide)
     const matchesRelationship = filterRelationship === 'all' || guest.relationship === filterRelationship
+    const matchesPriority = filterPriority === 'all' || guest.priority === filterPriority
     const matchesKids = showKids || !guest.is_child
 
-    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship && matchesKids
+    return matchesSearch && matchesRsvp && matchesSide && matchesRelationship && matchesPriority && matchesKids
   })
 
   const sortedGuests = useMemo(() => {
@@ -322,8 +362,17 @@ export default function GuestsPage() {
       }
     })
 
-    return result.sort((a, b) => a.family.localeCompare(b.family))
-  }, [sortedGuests])
+    // Sort family groups by last name, respecting sort direction
+    return result.sort((a, b) => {
+      const aLastName = getLastName(a.family.replace(' Family', ''))
+      const bLastName = getLastName(b.family.replace(' Family', ''))
+
+      if (sortBy === 'last-name-desc') {
+        return bLastName.localeCompare(aLastName)
+      }
+      return aLastName.localeCompare(bLastName)
+    })
+  }, [sortedGuests, sortBy])
 
   const handleSelectGuest = (guest: Guest) => {
     setSelectedGuest(guest)
@@ -350,6 +399,19 @@ export default function GuestsPage() {
     setIsEditing(false)
     setIsCreating(true)
     setFormData(emptyFormData)
+  }
+
+  const handleAddChildToFamily = (parent: Guest) => {
+    setSelectedGuest(null)
+    setIsEditing(false)
+    setIsCreating(true)
+    setFormData({
+      ...emptyFormData,
+      is_child: true,
+      parent_id: parent.id,
+      group_name: parent.group_name || '',
+      priority: 'Maybe',
+    })
   }
 
   const handleStartEdit = () => {
@@ -528,6 +590,188 @@ export default function GuestsPage() {
     }
   }
 
+  const handleQuickSide = async (guest: Guest, side: string) => {
+    const { error } = await supabase
+      .from('guests')
+      .update({ group_name: side, updated_at: new Date().toISOString() })
+      .eq('id', guest.id)
+
+    if (error) {
+      toast.error('Failed to update side')
+    } else {
+      const updatedGuest = { ...guest, group_name: side }
+      setGuests(guests.map(g => g.id === guest.id ? updatedGuest : g))
+      if (selectedGuest?.id === guest.id) {
+        setSelectedGuest(updatedGuest)
+        setFormData({ ...formData, group_name: side })
+      }
+      toast.success(`Side updated to ${side}`)
+    }
+  }
+
+  const handleExport = () => {
+    // CSV escape function - wraps in quotes and escapes internal quotes
+    const escapeCSV = (value: string | null | undefined): string => {
+      if (value === null || value === undefined) return ''
+      const str = String(value)
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
+    // Helper to get guest name by ID
+    const getGuestName = (id: string | null): string => {
+      if (!id) return ''
+      const guest = guests.find(g => g.id === id)
+      return guest?.name || ''
+    }
+
+    // CSV header
+    const headers = [
+      'Name',
+      'Side',
+      'Relationship',
+      'Priority',
+      'RSVP Status',
+      'Dietary Restrictions',
+      'Address',
+      'Plus One',
+      'Notes',
+      'Is Child',
+      'Partner',
+      'Parent'
+    ]
+
+    // CSV rows
+    const rows = guests.map(guest => [
+      escapeCSV(guest.name),
+      escapeCSV(guest.group_name),
+      escapeCSV(guest.relationship),
+      escapeCSV(guest.priority),
+      escapeCSV(guest.rsvp_status),
+      escapeCSV(guest.dietary_restrictions),
+      escapeCSV(guest.address),
+      escapeCSV(guest.plus_one),
+      escapeCSV(guest.notes),
+      guest.is_child ? 'Yes' : 'No',
+      escapeCSV(getGuestName(guest.partner_id)),
+      escapeCSV(getGuestName(guest.parent_id))
+    ])
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n')
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${wedding?.name || 'guests'}-guest-list.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast.success(`Exported ${guests.length} guests to CSV`)
+  }
+
+  // Selection handlers
+  const toggleSelection = (guestId: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(guestId)) {
+        newSet.delete(guestId)
+      } else {
+        newSet.add(guestId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedGuests.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sortedGuests.map(g => g.id)))
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+  }
+
+  // Bulk action handlers
+  const handleBulkRsvp = async (status: 'pending' | 'confirmed' | 'declined') => {
+    if (selectedIds.size === 0) return
+
+    const idsArray = Array.from(selectedIds)
+    const { error } = await supabase
+      .from('guests')
+      .update({ rsvp_status: status, updated_at: new Date().toISOString() })
+      .in('id', idsArray)
+
+    if (error) {
+      toast.error('Failed to update RSVP status')
+      console.error(error)
+    } else {
+      setGuests(guests.map(g =>
+        selectedIds.has(g.id) ? { ...g, rsvp_status: status } : g
+      ))
+      toast.success(`Updated ${selectedIds.size} guests to ${status}`)
+      clearSelection()
+    }
+  }
+
+  const handleBulkSide = async (side: string) => {
+    if (selectedIds.size === 0) return
+
+    const idsArray = Array.from(selectedIds)
+    const { error } = await supabase
+      .from('guests')
+      .update({ group_name: side, updated_at: new Date().toISOString() })
+      .in('id', idsArray)
+
+    if (error) {
+      toast.error('Failed to update side')
+      console.error(error)
+    } else {
+      setGuests(guests.map(g =>
+        selectedIds.has(g.id) ? { ...g, group_name: side } : g
+      ))
+      toast.success(`Updated ${selectedIds.size} guests to ${side}`)
+      clearSelection()
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} guests? This cannot be undone.`)) return
+
+    const idsArray = Array.from(selectedIds)
+    const { error } = await supabase
+      .from('guests')
+      .delete()
+      .in('id', idsArray)
+
+    if (error) {
+      toast.error('Failed to delete guests')
+      console.error(error)
+    } else {
+      setGuests(guests.filter(g => !selectedIds.has(g.id)))
+      if (selectedGuest && selectedIds.has(selectedGuest.id)) {
+        setSelectedGuest(null)
+      }
+      toast.success(`Deleted ${selectedIds.size} guests`)
+      clearSelection()
+    }
+  }
+
+  const showDetailPanel = selectedGuest || isCreating
+
   if (weddingLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -544,23 +788,18 @@ export default function GuestsPage() {
     )
   }
 
-  const stats = {
-    total: guests.length,
-    confirmed: guests.filter(g => g.rsvp_status === 'confirmed').length,
-    pending: guests.filter(g => g.rsvp_status === 'pending').length,
-    declined: guests.filter(g => g.rsvp_status === 'declined').length,
-  }
-
-  const showDetailPanel = selectedGuest || isCreating
-
   return (
     <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col">
       {/* Header */}
       <PageHeader
         title="Guests"
-        count={stats.total}
-        countLabel={`guests • ${stats.confirmed} confirmed • ${stats.pending} pending`}
+        count={guests.length}
+        countLabel={`guests • ${guests.filter(g => g.rsvp_status === 'confirmed').length} confirmed • ${guests.filter(g => g.rsvp_status === 'pending').length} pending`}
       >
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="h-4 w-4" />
+          <span className="hidden sm:inline ml-2">Export</span>
+        </Button>
         <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)}>
           <Upload className="h-4 w-4" />
           <span className="hidden sm:inline ml-2">Import</span>
@@ -579,6 +818,68 @@ export default function GuestsPage() {
         existingGuests={guests.map(g => ({ name: g.name }))}
         onSuccess={fetchGuests}
       />
+
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 mb-4 bg-primary/5 border border-primary/20 rounded-xl">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={selectedIds.size === sortedGuests.length && sortedGuests.length > 0}
+              onCheckedChange={toggleSelectAll}
+            />
+            <span className="text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Set RSVP
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {RSVP_OPTIONS.map((status) => (
+                  <DropdownMenuItem
+                    key={status}
+                    onClick={() => handleBulkRsvp(status)}
+                    className="capitalize"
+                  >
+                    {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                    {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                    {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                    {status}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Set Side
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {sideOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => handleBulkSide(option.value)}
+                  >
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" onClick={handleBulkDelete} className="text-destructive hover:text-destructive">
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content - List + Detail Layout */}
       <div className="flex-1 flex gap-6 min-h-0 overflow-hidden min-w-0">
@@ -632,6 +933,17 @@ export default function GuestsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={filterPriority} onValueChange={setFilterPriority}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  {PRIORITY_OPTIONS.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <Select value={sortBy} onValueChange={setSortBy}>
@@ -666,6 +978,29 @@ export default function GuestsPage() {
                   Show kids
                 </Label>
               </div>
+              {/* View Toggle */}
+              <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    viewMode === 'list' ? "bg-background shadow-sm" : "hover:bg-background/50"
+                  )}
+                  title="List view"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    viewMode === 'table' ? "bg-background shadow-sm" : "hover:bg-background/50"
+                  )}
+                  title="Table view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="text-sm text-muted-foreground">
               Showing {sortedGuests.length} of {guests.length} guests
@@ -688,102 +1023,799 @@ export default function GuestsPage() {
                     </Button>
                   )}
                 </div>
+              ) : viewMode === 'table' ? (
+                /* Table View */
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={selectedIds.size === sortedGuests.length && sortedGuests.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Side</TableHead>
+                      <TableHead>Relationship</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>RSVP</TableHead>
+                      <TableHead>Info</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupByFamily ? (
+                      /* Grouped Table View - Families first, then singles */
+                      <>
+                        {/* Families (2+ members) */}
+                        {groupedByFamily.filter(g => g.members.length > 1).map(({ family, members, key }) => (
+                          <React.Fragment key={key}>
+                            <TableRow className="bg-muted/80 hover:bg-muted/80">
+                              <TableCell colSpan={8} className="py-2">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="font-semibold text-sm">{family}</span>
+                                    <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleAddChildToFamily(members.find(m => !m.is_child) || members[0])
+                                    }}
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Add Child
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {members.map((guest) => (
+                              <TableRow
+                                key={guest.id}
+                                className={cn(
+                                  "cursor-pointer border-l-2 border-l-primary/30 bg-muted/30",
+                                  selectedGuest?.id === guest.id && "bg-primary/5"
+                                )}
+                                onClick={() => handleSelectGuest(guest)}
+                              >
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedIds.has(guest.id)}
+                                    onCheckedChange={() => toggleSelection(guest.id)}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <div className={cn(
+                                    "w-2 h-2 rounded-full",
+                                    getPriorityColor(guest.priority)
+                                  )} />
+                                </TableCell>
+                                <TableCell>
+                                  <div className={cn("flex items-center gap-2", guest.is_child && "pl-6")}>
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-medium text-primary">
+                                        {getInitials(guest.name)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium">{guest.name}</span>
+                                      {guest.is_child && (
+                                        <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="focus:outline-none text-muted-foreground hover:text-foreground">
+                                        {guest.group_name || 'Set side'}
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                      {sideOptions.map((option) => (
+                                        <DropdownMenuItem
+                                          key={option.value}
+                                          onClick={() => handleQuickSide(guest, option.value)}
+                                        >
+                                          {option.label}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {guest.relationship || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-sm">{guest.priority || '-'}</span>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="focus:outline-none">
+                                        <Badge
+                                          variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                          className="capitalize cursor-pointer hover:opacity-80"
+                                        >
+                                          {guest.rsvp_status}
+                                        </Badge>
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {RSVP_OPTIONS.map((status) => (
+                                        <DropdownMenuItem
+                                          key={status}
+                                          onClick={() => handleQuickRsvp(guest, status)}
+                                          className="capitalize"
+                                        >
+                                          {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                          {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                          {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                          {status}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                                <TableCell>
+                                  <TooltipProvider>
+                                    <div className="flex items-center gap-1.5">
+                                      {guest.dietary_restrictions && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                          </TooltipTrigger>
+                                          <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {guest.address && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                          </TooltipTrigger>
+                                          <TooltipContent><p>Address on file</p></TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {guest.partner_id && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                          </TooltipTrigger>
+                                          <TooltipContent><p>Partner linked</p></TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                    </div>
+                                  </TooltipProvider>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </React.Fragment>
+                        ))}
+
+                        {/* Singles section with header */}
+                        {groupedByFamily.filter(g => g.members.length === 1).length > 0 && (
+                          <>
+                            <TableRow className="bg-muted/80 hover:bg-muted/80">
+                              <TableCell colSpan={8} className="py-2">
+                                <span className="font-semibold text-sm">Individual Guests</span>
+                                <span className="text-muted-foreground text-sm ml-2">
+                                  ({groupedByFamily.filter(g => g.members.length === 1).length})
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                            {groupedByFamily.filter(g => g.members.length === 1).map(({ members, key }) => {
+                              const guest = members[0]
+                              return (
+                                <TableRow
+                                  key={key}
+                                  className={cn(
+                                    "cursor-pointer",
+                                    selectedGuest?.id === guest.id && "bg-primary/5"
+                                  )}
+                                  onClick={() => handleSelectGuest(guest)}
+                                >
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={selectedIds.has(guest.id)}
+                                      onCheckedChange={() => toggleSelection(guest.id)}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className={cn(
+                                      "w-2 h-2 rounded-full",
+                                      getPriorityColor(guest.priority)
+                                    )} />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-xs font-medium text-primary">
+                                          {getInitials(guest.name)}
+                                        </span>
+                                      </div>
+                                      <span className="font-medium">{guest.name}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button className="focus:outline-none text-muted-foreground hover:text-foreground">
+                                          {guest.group_name || 'Set side'}
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="start">
+                                        {sideOptions.map((option) => (
+                                          <DropdownMenuItem
+                                            key={option.value}
+                                            onClick={() => handleQuickSide(guest, option.value)}
+                                          >
+                                            {option.label}
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {guest.relationship || '-'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-sm">{guest.priority || '-'}</span>
+                                  </TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button className="focus:outline-none">
+                                          <Badge
+                                            variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                            className="capitalize cursor-pointer hover:opacity-80"
+                                          >
+                                            {guest.rsvp_status}
+                                          </Badge>
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        {RSVP_OPTIONS.map((status) => (
+                                          <DropdownMenuItem
+                                            key={status}
+                                            onClick={() => handleQuickRsvp(guest, status)}
+                                            className="capitalize"
+                                          >
+                                            {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                            {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                            {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                            {status}
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                  <TableCell>
+                                    <TooltipProvider>
+                                      <div className="flex items-center gap-1.5">
+                                        {guest.dietary_restrictions && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        {guest.address && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Address on file</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        {guest.partner_id && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Partner linked</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        {guest.plus_one && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Has plus one</p></TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                      </div>
+                                    </TooltipProvider>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      /* Flat Table View */
+                      sortedGuests.map((guest) => (
+                        <TableRow
+                          key={guest.id}
+                          className={cn(
+                            "cursor-pointer",
+                            selectedGuest?.id === guest.id && "bg-primary/5"
+                          )}
+                          onClick={() => handleSelectGuest(guest)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedIds.has(guest.id)}
+                              onCheckedChange={() => toggleSelection(guest.id)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className={cn(
+                              "w-2 h-2 rounded-full",
+                              getPriorityColor(guest.priority)
+                            )} />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-medium text-primary">
+                                  {getInitials(guest.name)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium">{guest.name}</span>
+                                {guest.is_child && (
+                                  <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="focus:outline-none text-muted-foreground hover:text-foreground">
+                                  {guest.group_name || 'Set side'}
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                {sideOptions.map((option) => (
+                                  <DropdownMenuItem
+                                    key={option.value}
+                                    onClick={() => handleQuickSide(guest, option.value)}
+                                  >
+                                    {option.label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {guest.relationship || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{guest.priority || '-'}</span>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="focus:outline-none">
+                                  <Badge
+                                    variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                    className="capitalize cursor-pointer hover:opacity-80"
+                                  >
+                                    {guest.rsvp_status}
+                                  </Badge>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {RSVP_OPTIONS.map((status) => (
+                                  <DropdownMenuItem
+                                    key={status}
+                                    onClick={() => handleQuickRsvp(guest, status)}
+                                    className="capitalize"
+                                  >
+                                    {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                    {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                    {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                    {status}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                          <TableCell>
+                            <TooltipProvider>
+                              <div className="flex items-center gap-1.5">
+                                {guest.dietary_restrictions && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {guest.address && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Address on file</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {guest.partner_id && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Partner linked</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {guest.plus_one && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Has plus one</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               ) : groupByFamily ? (
-                /* Grouped by Family View */
+                /* Grouped by Family View - Families first, then singles */
                 <div>
-                  {groupedByFamily.map(({ family, members, key }) => (
+                  {/* Families (2+ members) */}
+                  {groupedByFamily.filter(g => g.members.length > 1).map(({ family, members, key }) => (
                     <div key={key}>
-                      {/* Family Header */}
-                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
-                        <span className="font-semibold text-sm">{family}</span>
-                        <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-sm">{family}</span>
+                          <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddChildToFamily(members.find(m => !m.is_child) || members[0])
+                          }}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add Child
+                        </Button>
                       </div>
-                      {/* Family Members */}
-                      <div className="divide-y">
+                      <div className="divide-y border-l-2 border-l-primary/30 bg-muted/30">
                         {members.map((guest) => (
-                          <button
+                          <div
                             key={guest.id}
-                            onClick={() => handleSelectGuest(guest)}
                             className={cn(
-                              "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
+                              "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors min-w-0",
                               selectedGuest?.id === guest.id && "bg-primary/5",
                               guest.is_child && "pl-8"
                             )}
                           >
-                            <div className={cn(
-                              "flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center",
-                              guest.is_child ? "w-8 h-8" : "w-10 h-10"
-                            )}>
-                              <span className={cn(
-                                "font-medium text-primary",
-                                guest.is_child ? "text-xs" : "text-sm"
-                              )}>
-                                {getInitials(guest.name)}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate flex items-center gap-1.5">
-                                {guest.name}
-                                {guest.is_child && (
-                                  <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                )}
-                              </div>
-                              <div className="text-sm text-muted-foreground truncate">
-                                {guest.relationship || guest.group_name || 'No info'}
-                              </div>
-                            </div>
-                            <Badge
-                              variant={getRsvpBadgeVariant(guest.rsvp_status)}
-                              className="capitalize flex-shrink-0"
+                            <Checkbox
+                              checked={selectedIds.has(guest.id)}
+                              onCheckedChange={() => toggleSelection(guest.id)}
+                              className="flex-shrink-0"
+                            />
+                            <button
+                              onClick={() => handleSelectGuest(guest)}
+                              className="flex items-center gap-3 flex-1 min-w-0 text-left"
                             >
-                              {guest.rsvp_status}
-                            </Badge>
-                          </button>
+                              <div className={cn(
+                                "w-2 h-2 rounded-full flex-shrink-0",
+                                getPriorityColor(guest.priority)
+                              )} />
+                              <div className={cn(
+                                "flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center",
+                                guest.is_child ? "w-8 h-8" : "w-10 h-10"
+                              )}>
+                                <span className={cn(
+                                  "font-medium text-primary",
+                                  guest.is_child ? "text-xs" : "text-sm"
+                                )}>
+                                  {getInitials(guest.name)}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate flex items-center gap-1.5">
+                                  {guest.name}
+                                  {guest.is_child && (
+                                    <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground truncate">
+                                  {guest.relationship || guest.group_name || 'No info'}
+                                </div>
+                              </div>
+                              <TooltipProvider>
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  {guest.dietary_restrictions && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {guest.address && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Address on file</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {guest.partner_id && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Partner linked</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                              </TooltipProvider>
+                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="focus:outline-none">
+                                  <Badge
+                                    variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                    className="capitalize flex-shrink-0 cursor-pointer hover:opacity-80"
+                                  >
+                                    {guest.rsvp_status}
+                                  </Badge>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {RSVP_OPTIONS.map((status) => (
+                                  <DropdownMenuItem
+                                    key={status}
+                                    onClick={() => handleQuickRsvp(guest, status)}
+                                    className="capitalize"
+                                  >
+                                    {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                    {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                    {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                    {status}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         ))}
                       </div>
                     </div>
                   ))}
+
+                  {/* Singles section with header */}
+                  {groupedByFamily.filter(g => g.members.length === 1).length > 0 && (
+                    <div>
+                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
+                        <span className="font-semibold text-sm">Individual Guests</span>
+                        <span className="text-muted-foreground text-sm ml-2">
+                          ({groupedByFamily.filter(g => g.members.length === 1).length})
+                        </span>
+                      </div>
+                      <div className="divide-y">
+                        {groupedByFamily.filter(g => g.members.length === 1).map(({ members, key }) => {
+                          const guest = members[0]
+                          return (
+                            <div
+                              key={key}
+                              className={cn(
+                                "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors min-w-0",
+                                selectedGuest?.id === guest.id && "bg-primary/5"
+                              )}
+                            >
+                              <Checkbox
+                                checked={selectedIds.has(guest.id)}
+                                onCheckedChange={() => toggleSelection(guest.id)}
+                                className="flex-shrink-0"
+                              />
+                              <button
+                                onClick={() => handleSelectGuest(guest)}
+                                className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                              >
+                                <div className={cn(
+                                  "w-2 h-2 rounded-full flex-shrink-0",
+                                  getPriorityColor(guest.priority)
+                                )} />
+                                <div className="flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center w-10 h-10">
+                                  <span className="font-medium text-primary text-sm">
+                                    {getInitials(guest.name)}
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{guest.name}</div>
+                                  <div className="text-sm text-muted-foreground truncate">
+                                    {guest.relationship || guest.group_name || 'No info'}
+                                  </div>
+                                </div>
+                                <TooltipProvider>
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {guest.dietary_restrictions && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Dietary restrictions</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {guest.address && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><MapPin className="h-3.5 w-3.5 text-blue-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Address on file</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {guest.partner_id && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Partner linked</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {guest.plus_one && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Has plus one</p></TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                </TooltipProvider>
+                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="focus:outline-none">
+                                    <Badge
+                                      variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                                      className="capitalize flex-shrink-0 cursor-pointer hover:opacity-80"
+                                    >
+                                      {guest.rsvp_status}
+                                    </Badge>
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {RSVP_OPTIONS.map((status) => (
+                                    <DropdownMenuItem
+                                      key={status}
+                                      onClick={() => handleQuickRsvp(guest, status)}
+                                      className="capitalize"
+                                    >
+                                      {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                                      {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                                      {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                                      {status}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Flat List View */
                 <div className="divide-y">
                   {sortedGuests.map((guest) => (
-                    <button
+                    <div
                       key={guest.id}
-                      onClick={() => handleSelectGuest(guest)}
                       className={cn(
-                        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors min-w-0",
+                        "flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors min-w-0",
                         selectedGuest?.id === guest.id && "bg-primary/5"
                       )}
                     >
-                      {/* Avatar */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary">
-                          {getInitials(guest.name)}
-                        </span>
-                      </div>
+                      {/* Checkbox */}
+                      <Checkbox
+                        checked={selectedIds.has(guest.id)}
+                        onCheckedChange={() => toggleSelection(guest.id)}
+                        className="flex-shrink-0"
+                      />
+                      {/* Clickable area for guest selection */}
+                      <button
+                        onClick={() => handleSelectGuest(guest)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        {/* Priority dot */}
+                        <div className={cn(
+                          "w-2 h-2 rounded-full flex-shrink-0",
+                          getPriorityColor(guest.priority)
+                        )} title={guest.priority || 'No priority'} />
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate flex items-center gap-1.5">
-                          {guest.name}
-                          {guest.is_child && (
-                            <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        {/* Avatar */}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-sm font-medium text-primary">
+                            {getInitials(guest.name)}
+                          </span>
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate flex items-center gap-1.5">
+                            {guest.name}
+                            {guest.is_child && (
+                              <Baby className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            {guest.group_name || guest.relationship || 'No group'}
+                          </div>
+                        </div>
+
+                        {/* Indicator icons */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {guest.dietary_restrictions && (
+                            <span title="Has dietary restrictions">
+                              <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
+                            </span>
+                          )}
+                          {guest.address && (
+                            <span title="Address on file">
+                              <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                            </span>
+                          )}
+                          {guest.partner_id && (
+                            <span title="Has partner linked">
+                              <Heart className="h-3.5 w-3.5 text-pink-500" />
+                            </span>
+                          )}
+                          {guest.plus_one && (
+                            <span title="Has plus one">
+                              <UserPlus className="h-3.5 w-3.5 text-purple-500" />
+                            </span>
                           )}
                         </div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {guest.group_name || guest.relationship || 'No group'}
-                        </div>
-                      </div>
+                      </button>
 
-                      {/* RSVP Badge */}
-                      <Badge
-                        variant={getRsvpBadgeVariant(guest.rsvp_status)}
-                        className="capitalize flex-shrink-0"
-                      >
-                        {guest.rsvp_status}
-                      </Badge>
-                    </button>
+                      {/* Inline RSVP Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="focus:outline-none">
+                            <Badge
+                              variant={getRsvpBadgeVariant(guest.rsvp_status)}
+                              className="capitalize flex-shrink-0 cursor-pointer hover:opacity-80"
+                            >
+                              {guest.rsvp_status}
+                            </Badge>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {RSVP_OPTIONS.map((status) => (
+                            <DropdownMenuItem
+                              key={status}
+                              onClick={() => handleQuickRsvp(guest, status)}
+                              className="capitalize"
+                            >
+                              {status === 'confirmed' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />}
+                              {status === 'pending' && <Clock className="h-4 w-4 mr-2 text-yellow-500" />}
+                              {status === 'declined' && <XCircle className="h-4 w-4 mr-2 text-red-500" />}
+                              {status}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1201,23 +2233,6 @@ export default function GuestsPage() {
           </Card>
         )}
 
-        {/* Empty State - No selection on desktop */}
-        {!showDetailPanel && (
-          <div className="hidden lg:flex flex-1 items-center justify-center">
-            <Card className="w-full max-w-md">
-              <CardContent className="py-12 text-center">
-                <Users className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Select a guest from the list to view their details
-                </p>
-                <Button onClick={handleStartCreate}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Guest
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   )
