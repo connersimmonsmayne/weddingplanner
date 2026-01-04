@@ -401,6 +401,19 @@ export default function GuestsPage() {
     setFormData(emptyFormData)
   }
 
+  const handleAddChildToFamily = (parent: Guest) => {
+    setSelectedGuest(null)
+    setIsEditing(false)
+    setIsCreating(true)
+    setFormData({
+      ...emptyFormData,
+      is_child: true,
+      parent_id: parent.id,
+      group_name: parent.group_name || '',
+      priority: 'Maybe',
+    })
+  }
+
   const handleStartEdit = () => {
     setIsEditing(true)
   }
@@ -1039,8 +1052,24 @@ export default function GuestsPage() {
                           <React.Fragment key={key}>
                             <TableRow className="bg-muted/80 hover:bg-muted/80">
                               <TableCell colSpan={8} className="py-2">
-                                <span className="font-semibold text-sm">{family}</span>
-                                <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="font-semibold text-sm">{family}</span>
+                                    <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleAddChildToFamily(members.find(m => !m.is_child) || members[0])
+                                    }}
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Add Child
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                             {members.map((guest) => (
@@ -1157,14 +1186,6 @@ export default function GuestsPage() {
                                             <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
                                           </TooltipTrigger>
                                           <TooltipContent><p>Partner linked</p></TooltipContent>
-                                        </Tooltip>
-                                      )}
-                                      {guest.plus_one && (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
-                                          </TooltipTrigger>
-                                          <TooltipContent><p>Has plus one</p></TooltipContent>
                                         </Tooltip>
                                       )}
                                     </div>
@@ -1456,9 +1477,23 @@ export default function GuestsPage() {
                   {/* Families (2+ members) */}
                   {groupedByFamily.filter(g => g.members.length > 1).map(({ family, members, key }) => (
                     <div key={key}>
-                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b">
-                        <span className="font-semibold text-sm">{family}</span>
-                        <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                      <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-2 border-b flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-sm">{family}</span>
+                          <span className="text-muted-foreground text-sm ml-2">({members.length})</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddChildToFamily(members.find(m => !m.is_child) || members[0])
+                          }}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add Child
+                        </Button>
                       </div>
                       <div className="divide-y border-l-2 border-l-primary/30 bg-muted/30">
                         {members.map((guest) => (
@@ -1529,14 +1564,6 @@ export default function GuestsPage() {
                                         <span><Heart className="h-3.5 w-3.5 text-pink-500" /></span>
                                       </TooltipTrigger>
                                       <TooltipContent><p>Partner linked</p></TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {guest.plus_one && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span><UserPlus className="h-3.5 w-3.5 text-purple-500" /></span>
-                                      </TooltipTrigger>
-                                      <TooltipContent><p>Has plus one</p></TooltipContent>
                                     </Tooltip>
                                   )}
                                 </div>
