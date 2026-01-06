@@ -516,7 +516,7 @@ export default function VendorsPage() {
     researching: vendors.filter(v => v.status === 'researching').length,
   }
 
-  const showDetailPanel = selectedVendor || isCreating
+  const showDetailPanel = selectedVendor !== null
 
   // Render grouped category select options
   const renderCategoryOptions = () => {
@@ -713,10 +713,10 @@ export default function VendorsPage() {
             <CardHeader className="flex-shrink-0 border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">
-                  {isCreating ? 'New Vendor' : (isEditing ? 'Edit Vendor' : 'Vendor Details')}
+                  {isEditing ? 'Edit Vendor' : 'Vendor Details'}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {!isCreating && !isEditing && selectedVendor && (
+                  {!isEditing && selectedVendor && (
                     <>
                       <Button variant="outline" size="sm" onClick={handleStartEdit}>
                         Edit
@@ -735,8 +735,8 @@ export default function VendorsPage() {
 
             {/* Detail Content */}
             <CardContent className="flex-1 overflow-y-auto p-6">
-              {(isEditing || isCreating) ? (
-                /* Edit/Create Form */
+              {isEditing ? (
+                /* Edit Form */
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -902,7 +902,7 @@ export default function VendorsPage() {
                       Cancel
                     </Button>
                     <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                      {saving ? 'Saving...' : (isCreating ? 'Add Vendor' : 'Save Changes')}
+                      {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
                 </div>
@@ -1188,6 +1188,188 @@ export default function VendorsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Vendor Modal */}
+      <Dialog open={isCreating} onOpenChange={(open) => !open && setIsCreating(false)}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Add Vendor</DialogTitle>
+            <DialogDescription>
+              Add a new vendor to your wedding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-category">Category *</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger id="create-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {renderCategoryOptions()}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: typeof STATUS_OPTIONS[number]) =>
+                    setFormData({ ...formData, status: value })
+                  }
+                >
+                  <SelectTrigger id="create-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-name">Vendor Name *</Label>
+              <Input
+                id="create-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Smith Photography"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-contact">Contact Name</Label>
+                <Input
+                  id="create-contact"
+                  value={formData.contact_name}
+                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                  placeholder="John Smith"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-phone">Phone</Label>
+                <Input
+                  id="create-phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="vendor@example.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-website">Website</Label>
+              <Input
+                id="create-website"
+                value={formData.website}
+                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                placeholder="https://example.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-address">Address</Label>
+              <Input
+                id="create-address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="123 Main St, City, State 12345"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-visit_date">Visit Date</Label>
+                <Input
+                  id="create-visit_date"
+                  type="date"
+                  value={formData.visit_date}
+                  onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-quote">Quote ($)</Label>
+                <Input
+                  id="create-quote"
+                  type="number"
+                  value={formData.quote}
+                  onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                  placeholder="2500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-rating">Rating</Label>
+              <Select
+                value={formData.rating?.toString() || 'none'}
+                onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
+              >
+                <SelectTrigger id="create-rating">
+                  <SelectValue placeholder="Rate" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No rating</SelectItem>
+                  {[1, 2, 3, 4, 5].map((r) => (
+                    <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-package">Package Details</Label>
+              <Textarea
+                id="create-package"
+                value={formData.package_details}
+                onChange={(e) => setFormData({ ...formData, package_details: e.target.value })}
+                placeholder="What's included in the quote?"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-notes">Notes</Label>
+              <Textarea
+                id="create-notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Any additional notes"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreating(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Adding...' : 'Add Vendor'}
             </Button>
           </DialogFooter>
         </DialogContent>
