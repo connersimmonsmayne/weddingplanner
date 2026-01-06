@@ -293,11 +293,11 @@ export default function VendorsPage() {
     })
   }
 
-  const handleStartCreate = () => {
+  const handleStartCreate = (prefilledCategory?: string) => {
     setSelectedVendor(null)
     setIsEditing(false)
     setIsCreating(true)
-    const defaultCategory = filterCategory !== 'all' ? filterCategory : (categories[0]?.name || '')
+    const defaultCategory = prefilledCategory || (filterCategory !== 'all' ? filterCategory : (categories[0]?.name || ''))
     setFormData({
       ...emptyFormData,
       category: defaultCategory,
@@ -607,7 +607,7 @@ export default function VendorsPage() {
         count={stats.total}
         countLabel={`vendors • ${stats.booked} booked • ${stats.researching} researching`}
       >
-        <Button size="sm" onClick={handleStartCreate}>
+        <Button size="sm" onClick={() => handleStartCreate()}>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline ml-2">Add Vendor</span>
         </Button>
@@ -679,49 +679,97 @@ export default function VendorsPage() {
           </div>
 
           {/* Vendor List */}
-          <Card className="flex-1 overflow-hidden">
-            <CardContent className="p-0 h-full overflow-y-auto">
-              {filteredVendors.length === 0 ? (
+          {filteredVendors.length === 0 ? (
+            <Card className="flex-1 overflow-hidden">
+              <CardContent className="p-0 h-full flex items-center justify-center">
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Store className="h-12 w-12 text-muted-foreground/50 mb-3" />
                   <p className="text-muted-foreground">
                     {vendors.length === 0 ? 'No vendors yet' : 'No vendors match your filters'}
                   </p>
                   {vendors.length === 0 && (
-                    <Button variant="outline" className="mt-4" onClick={handleStartCreate}>
+                    <Button variant="outline" className="mt-4" onClick={() => handleStartCreate()}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add your first vendor
                     </Button>
                   )}
                 </div>
-              ) : groupByCategory ? (
-                /* Grouped View */
-                <div className="divide-y">
-                  {groupedVendors.map(({ category, icon, vendors: categoryVendors }) => (
-                    <Fragment key={category}>
-                      {/* Category Header */}
-                      <div className="bg-muted/80 px-4 py-2 sticky top-0">
-                        <div className="flex items-center gap-2">
-                          <span>{icon}</span>
-                          <span className="font-semibold text-sm">{category}</span>
-                          <span className="text-muted-foreground text-sm">({categoryVendors.length})</span>
+              </CardContent>
+            </Card>
+          ) : groupByCategory ? (
+            /* Grid of Category Cards */
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {groupedVendors.map(({ category, icon, vendors: categoryVendors }) => {
+                  const bookedCount = categoryVendors.filter(v => v.status === 'booked').length
+                  return (
+                    <Card key={category}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{icon}</span>
+                            <CardTitle className="text-base">{category}</CardTitle>
+                          </div>
                         </div>
-                      </div>
-                      {/* Category Vendors */}
-                      <div className="divide-y border-l-2 border-l-primary/30 bg-muted/30">
-                        {categoryVendors.map(vendor => renderVendorCard(vendor))}
-                      </div>
-                    </Fragment>
-                  ))}
-                </div>
-              ) : (
-                /* Flat List View */
+                        <p className="text-xs text-muted-foreground">
+                          {categoryVendors.length} vendor{categoryVendors.length !== 1 ? 's' : ''} • {bookedCount} booked
+                        </p>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {categoryVendors.length > 0 ? (
+                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                            {categoryVendors.map(vendor => (
+                              <button
+                                key={vendor.id}
+                                onClick={() => handleSelectVendor(vendor)}
+                                className={cn(
+                                  "w-full flex items-center justify-between gap-2 p-2 rounded-md text-left hover:bg-muted/50 transition-colors",
+                                  selectedVendor?.id === vendor.id && "bg-primary/5"
+                                )}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate">{vendor.name}</div>
+                                  {vendor.quote && (
+                                    <div className="text-xs text-muted-foreground">${vendor.quote.toLocaleString()}</div>
+                                  )}
+                                </div>
+                                <Badge
+                                  variant={getStatusBadgeVariant(vendor.status)}
+                                  className="capitalize text-xs flex-shrink-0"
+                                >
+                                  {vendor.status}
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground py-2">No vendors yet</p>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-3"
+                          onClick={() => handleStartCreate(category)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Vendor
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Flat List View */
+            <Card className="flex-1 overflow-hidden">
+              <CardContent className="p-0 h-full overflow-y-auto">
                 <div className="divide-y">
                   {filteredVendors.map(vendor => renderVendorCard(vendor))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Detail Panel */}
