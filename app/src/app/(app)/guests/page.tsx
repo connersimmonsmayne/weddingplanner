@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useMemo, Fragment } from 'react'
+import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
 import { Guest } from '@/types/database'
@@ -71,6 +71,7 @@ import {
   LayoutGrid
 } from 'lucide-react'
 import { CSVUploadDialog } from '@/components/ui/csv-upload-dialog'
+import { AddressAutocomplete, AddressResult } from '@/components/ui/address-autocomplete'
 import { cn } from '@/lib/utils'
 
 const RSVP_OPTIONS = ['pending', 'confirmed', 'declined'] as const
@@ -83,6 +84,12 @@ interface GuestFormData {
   priority: string
   plus_one: string
   address: string
+  street_address: string
+  city: string
+  state: string
+  zip_code: string
+  latitude: number | null
+  longitude: number | null
   notes: string
   rsvp_status: 'pending' | 'confirmed' | 'declined'
   dietary_restrictions: string
@@ -98,6 +105,12 @@ const emptyFormData: GuestFormData = {
   priority: 'Must Invite',
   plus_one: '',
   address: '',
+  street_address: '',
+  city: '',
+  state: '',
+  zip_code: '',
+  latitude: null,
+  longitude: null,
   notes: '',
   rsvp_status: 'pending',
   dietary_restrictions: '',
@@ -159,6 +172,12 @@ export default function GuestsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isAddingPartner, setIsAddingPartner] = useState(false)
   const [newPartnerName, setNewPartnerName] = useState('')
+  const [partnerAddressDialog, setPartnerAddressDialog] = useState<{
+    open: boolean
+    partnerName: string
+    partnerId: string
+    address: AddressResult | null
+  }>({ open: false, partnerName: '', partnerId: '', address: null })
   const supabase = createClient()
 
   useEffect(() => {
@@ -393,6 +412,12 @@ export default function GuestsPage() {
       priority: guest.priority || 'Must Invite',
       plus_one: guest.plus_one || '',
       address: guest.address || '',
+      street_address: guest.street_address || '',
+      city: guest.city || '',
+      state: guest.state || '',
+      zip_code: guest.zip_code || '',
+      latitude: guest.latitude,
+      longitude: guest.longitude,
       notes: guest.notes || '',
       rsvp_status: guest.rsvp_status,
       dietary_restrictions: guest.dietary_restrictions || '',
@@ -440,6 +465,12 @@ export default function GuestsPage() {
         priority: selectedGuest.priority || 'Must Invite',
         plus_one: selectedGuest.plus_one || '',
         address: selectedGuest.address || '',
+        street_address: selectedGuest.street_address || '',
+        city: selectedGuest.city || '',
+        state: selectedGuest.state || '',
+        zip_code: selectedGuest.zip_code || '',
+        latitude: selectedGuest.latitude,
+        longitude: selectedGuest.longitude,
         notes: selectedGuest.notes || '',
         rsvp_status: selectedGuest.rsvp_status,
         dietary_restrictions: selectedGuest.dietary_restrictions || '',
@@ -456,6 +487,81 @@ export default function GuestsPage() {
     setIsCreating(false)
   }
 
+  // Handle address selection - check if partner should also get the address
+  const handleAddressSelect = useCallback((addr: AddressResult) => {
+    // Update form data with address
+    setFormData(prev => ({
+      ...prev,
+      address: addr.fullAddress,
+      street_address: addr.streetAddress,
+      city: addr.city,
+      state: addr.state,
+      zip_code: addr.zipCode,
+      latitude: addr.latitude,
+      longitude: addr.longitude,
+    }))
+
+    // Check if guest has a partner and ask to apply address to them too
+    const partnerId = isEditing ? selectedGuest?.partner_id : formData.partner_id
+    if (partnerId) {
+      const partner = guests.find(g => g.id === partnerId)
+      if (partner) {
+        setPartnerAddressDialog({
+          open: true,
+          partnerName: partner.name,
+          partnerId: partner.id,
+          address: addr,
+        })
+      }
+    }
+  }, [isEditing, selectedGuest?.partner_id, formData.partner_id, guests])
+
+  // Apply address to partner
+  const handleApplyAddressToPartner = useCallback(async () => {
+    const { partnerId, address, partnerName } = partnerAddressDialog
+    if (!partnerId || !address) return
+
+    const { error } = await supabase
+      .from('guests')
+      .update({
+        address: address.fullAddress,
+        street_address: address.streetAddress,
+        city: address.city,
+        state: address.state,
+        zip_code: address.zipCode,
+        latitude: address.latitude,
+        longitude: address.longitude,
+        geocoded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', partnerId)
+
+    if (error) {
+      toast.error('Failed to update partner address')
+      console.error(error)
+    } else {
+      // Update local state
+      setGuests(prev => prev.map(g =>
+        g.id === partnerId
+          ? {
+              ...g,
+              address: address.fullAddress,
+              street_address: address.streetAddress,
+              city: address.city,
+              state: address.state,
+              zip_code: address.zipCode,
+              latitude: address.latitude,
+              longitude: address.longitude,
+              geocoded_at: new Date().toISOString(),
+            }
+          : g
+      ))
+      toast.success(`Address also updated for ${partnerName}`)
+    }
+
+    setPartnerAddressDialog({ open: false, partnerName: '', partnerId: '', address: null })
+  }, [partnerAddressDialog, supabase])
+
   const handleSave = async () => {
     if (!wedding?.id || !formData.name.trim()) {
       toast.error('Name is required')
@@ -464,11 +570,16 @@ export default function GuestsPage() {
 
     setSaving(true)
 
-    // Convert empty IDs to null for database
+    // Convert empty IDs to null for database and set geocoded_at if we have coordinates
     const dataToSave = {
       ...formData,
       parent_id: formData.parent_id || null,
       partner_id: formData.partner_id || null,
+      street_address: formData.street_address || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      zip_code: formData.zip_code || null,
+      geocoded_at: formData.latitude && formData.longitude ? new Date().toISOString() : null,
     }
 
     if (isCreating) {
@@ -2092,14 +2203,17 @@ export default function GuestsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea
-                      id="address"
+                    <Label>Address</Label>
+                    <AddressAutocomplete
                       value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="Mailing address"
-                      rows={2}
+                      onSelect={handleAddressSelect}
+                      placeholder="Start typing an address..."
                     />
+                    {formData.city && (
+                      <p className="text-xs text-muted-foreground">
+                        {formData.street_address && `${formData.street_address}, `}{formData.city}, {formData.state} {formData.zip_code}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -2393,13 +2507,11 @@ export default function GuestsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-address">Address</Label>
-              <Textarea
-                id="create-address"
+              <Label>Address</Label>
+              <AddressAutocomplete
                 value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Mailing address"
-                rows={2}
+                onSelect={handleAddressSelect}
+                placeholder="Start typing an address..."
               />
             </div>
 
@@ -2431,6 +2543,32 @@ export default function GuestsPage() {
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Adding...' : 'Add Guest'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Partner Address Dialog */}
+      <Dialog
+        open={partnerAddressDialog.open}
+        onOpenChange={(open) => !open && setPartnerAddressDialog({ open: false, partnerName: '', partnerId: '', address: null })}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Partner&apos;s Address?</DialogTitle>
+            <DialogDescription>
+              Would you like to set the same address for {partnerAddressDialog.partnerName}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setPartnerAddressDialog({ open: false, partnerName: '', partnerId: '', address: null })}
+            >
+              No, just this guest
+            </Button>
+            <Button onClick={handleApplyAddressToPartner}>
+              Yes, update both
             </Button>
           </DialogFooter>
         </DialogContent>

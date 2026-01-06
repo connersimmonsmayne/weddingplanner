@@ -49,6 +49,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AddressAutocomplete, AddressResult } from '@/components/ui/address-autocomplete'
 
 const STATUS_OPTIONS = ['researching', 'contacted', 'booked', 'rejected'] as const
 
@@ -978,53 +979,23 @@ export default function VendorsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-street_address">Street Address</Label>
-              <Input
-                id="create-street_address"
-                value={formData.street_address}
-                onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
-                placeholder="123 Main St"
+              <Label>Address</Label>
+              <AddressAutocomplete
+                value={formData.street_address ? `${formData.street_address}, ${formData.city}, ${formData.state} ${formData.zip_code}` : ''}
+                onSelect={(addr: AddressResult) => setFormData({
+                  ...formData,
+                  street_address: addr.streetAddress,
+                  city: addr.city,
+                  state: addr.state,
+                  zip_code: addr.zipCode,
+                })}
+                placeholder="Start typing an address..."
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="create-city">City</Label>
-                <Input
-                  id="create-city"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="City"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-2">
-                  <Label htmlFor="create-state">State</Label>
-                  <Select
-                    value={formData.state}
-                    onValueChange={(value) => setFormData({ ...formData, state: value })}
-                  >
-                    <SelectTrigger id="create-state">
-                      <SelectValue placeholder="State" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {US_STATES.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-zip_code">Zip</Label>
-                  <Input
-                    id="create-zip_code"
-                    value={formData.zip_code}
-                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                    placeholder="12345"
-                    maxLength={10}
-                  />
-                </div>
-              </div>
+              {formData.city && (
+                <p className="text-xs text-muted-foreground">
+                  {formData.street_address && `${formData.street_address}, `}{formData.city}, {formData.state} {formData.zip_code}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1212,53 +1183,23 @@ export default function VendorsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-street_address">Street Address</Label>
-                  <Input
-                    id="edit-street_address"
-                    value={formData.street_address}
-                    onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
-                    placeholder="123 Main St"
+                  <Label>Address</Label>
+                  <AddressAutocomplete
+                    value={formData.street_address ? `${formData.street_address}, ${formData.city}, ${formData.state} ${formData.zip_code}` : ''}
+                    onSelect={(addr: AddressResult) => setFormData({
+                      ...formData,
+                      street_address: addr.streetAddress,
+                      city: addr.city,
+                      state: addr.state,
+                      zip_code: addr.zipCode,
+                    })}
+                    placeholder="Start typing an address..."
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-city">City</Label>
-                    <Input
-                      id="edit-city"
-                      value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      placeholder="City"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-state">State</Label>
-                      <Select
-                        value={formData.state}
-                        onValueChange={(value) => setFormData({ ...formData, state: value })}
-                      >
-                        <SelectTrigger id="edit-state">
-                          <SelectValue placeholder="State" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {US_STATES.map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-zip_code">Zip</Label>
-                      <Input
-                        id="edit-zip_code"
-                        value={formData.zip_code}
-                        onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                        placeholder="12345"
-                        maxLength={10}
-                      />
-                    </div>
-                  </div>
+                  {formData.city && (
+                    <p className="text-xs text-muted-foreground">
+                      {formData.street_address && `${formData.street_address}, `}{formData.city}, {formData.state} {formData.zip_code}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
