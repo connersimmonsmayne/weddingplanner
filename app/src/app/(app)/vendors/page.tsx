@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, Fragment } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
 import { Vendor, VendorCategory } from '@/types/database'
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -147,6 +148,7 @@ export default function VendorsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState<VendorFormData>(emptyFormData)
   const [saving, setSaving] = useState(false)
+  const [groupByCategory, setGroupByCategory] = useState(true)
 
   // Category management state
   const [showCategoryModal, setShowCategoryModal] = useState(false)
@@ -212,6 +214,46 @@ export default function VendorsPage() {
 
     return matchesSearch && matchesCategory && matchesStatus
   })
+
+  // Group vendors by category for grouped view
+  const groupedVendors = useMemo(() => {
+    const groups: { category: string; section: string; icon: string; vendors: Vendor[] }[] = []
+    const categoryMap = new Map<string, Vendor[]>()
+
+    filteredVendors.forEach(vendor => {
+      if (!categoryMap.has(vendor.category)) {
+        categoryMap.set(vendor.category, [])
+      }
+      categoryMap.get(vendor.category)!.push(vendor)
+    })
+
+    // Sort by section order, then by category name
+    const sortedCategories = Array.from(categoryMap.keys()).sort((a, b) => {
+      const catA = categories.find(c => c.name === a)
+      const catB = categories.find(c => c.name === b)
+      const sectionA = catA?.section || 'other'
+      const sectionB = catB?.section || 'other'
+      const sectionOrderA = SECTION_ORDER.indexOf(sectionA as typeof SECTION_ORDER[number])
+      const sectionOrderB = SECTION_ORDER.indexOf(sectionB as typeof SECTION_ORDER[number])
+
+      if (sectionOrderA !== sectionOrderB) {
+        return sectionOrderA - sectionOrderB
+      }
+      return a.localeCompare(b)
+    })
+
+    sortedCategories.forEach(categoryName => {
+      const cat = categories.find(c => c.name === categoryName)
+      groups.push({
+        category: categoryName,
+        section: cat?.section || 'other',
+        icon: cat?.icon || DEFAULT_ICONS[categoryName] || '📦',
+        vendors: categoryMap.get(categoryName)!,
+      })
+    })
+
+    return groups
+  }, [filteredVendors, categories])
 
   const handleSelectVendor = (vendor: Vendor) => {
     setSelectedVendor(vendor)
@@ -498,6 +540,47 @@ export default function VendorsPage() {
     })
   }
 
+  // Render vendor card
+  const renderVendorCard = (vendor: Vendor) => (
+    <button
+      key={vendor.id}
+      onClick={() => handleSelectVendor(vendor)}
+      className={cn(
+        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors",
+        selectedVendor?.id === vendor.id && "bg-primary/5"
+      )}
+    >
+      {/* Category Icon */}
+      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">
+        {getCategoryIcon(vendor.category, categories)}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="font-medium truncate">{vendor.name}</div>
+        <div className="text-sm text-muted-foreground truncate">
+          {!groupByCategory && vendor.category}
+          {!groupByCategory && vendor.quote && ' • '}
+          {vendor.quote && `$${vendor.quote.toLocaleString()}`}
+        </div>
+        {vendor.visit_date && (
+          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+            <Calendar className="h-3 w-3" />
+            Visit: {new Date(vendor.visit_date).toLocaleDateString()}
+          </div>
+        )}
+      </div>
+
+      {/* Status Badge */}
+      <Badge
+        variant={getStatusBadgeVariant(vendor.status)}
+        className="capitalize flex-shrink-0"
+      >
+        {vendor.status}
+      </Badge>
+    </button>
+  )
+
   return (
     <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col">
       {/* Header */}
@@ -513,10 +596,10 @@ export default function VendorsPage() {
       </PageHeader>
 
       {/* Main Content - List + Detail Layout */}
-      <div className="flex-1 flex gap-6 min-h-0">
+      <div className="flex-1 flex gap-6 min-h-0 overflow-hidden min-w-0">
         {/* Vendor List Panel */}
         <div className={cn(
-          "flex flex-col min-h-0",
+          "flex flex-col min-h-0 overflow-hidden min-w-0",
           showDetailPanel ? "hidden lg:flex lg:w-[360px]" : "flex-1"
         )}>
           {/* Search & Filters */}
@@ -560,6 +643,21 @@ export default function VendorsPage() {
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="group-by-category"
+                  checked={groupByCategory}
+                  onCheckedChange={setGroupByCategory}
+                />
+                <Label htmlFor="group-by-category" className="text-sm text-muted-foreground cursor-pointer">
+                  Group by category
+                </Label>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredVendors.length} of {vendors.length} vendors
+              </div>
+            </div>
           </div>
 
           {/* Vendor List */}
@@ -578,46 +676,30 @@ export default function VendorsPage() {
                     </Button>
                   )}
                 </div>
-              ) : (
+              ) : groupByCategory ? (
+                /* Grouped View */
                 <div className="divide-y">
-                  {filteredVendors.map((vendor) => (
-                    <button
-                      key={vendor.id}
-                      onClick={() => handleSelectVendor(vendor)}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors",
-                        selectedVendor?.id === vendor.id && "bg-primary/5"
-                      )}
-                    >
-                      {/* Category Icon */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">
-                        {getCategoryIcon(vendor.category, categories)}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{vendor.name}</div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {vendor.category}
-                          {vendor.quote && ` • $${vendor.quote.toLocaleString()}`}
+                  {groupedVendors.map(({ category, icon, vendors: categoryVendors }) => (
+                    <Fragment key={category}>
+                      {/* Category Header */}
+                      <div className="bg-muted/80 px-4 py-2 sticky top-0">
+                        <div className="flex items-center gap-2">
+                          <span>{icon}</span>
+                          <span className="font-semibold text-sm">{category}</span>
+                          <span className="text-muted-foreground text-sm">({categoryVendors.length})</span>
                         </div>
-                        {vendor.visit_date && (
-                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Calendar className="h-3 w-3" />
-                            Visit: {new Date(vendor.visit_date).toLocaleDateString()}
-                          </div>
-                        )}
                       </div>
-
-                      {/* Status Badge */}
-                      <Badge
-                        variant={getStatusBadgeVariant(vendor.status)}
-                        className="capitalize flex-shrink-0"
-                      >
-                        {vendor.status}
-                      </Badge>
-                    </button>
+                      {/* Category Vendors */}
+                      <div className="divide-y border-l-2 border-l-primary/30 bg-muted/30">
+                        {categoryVendors.map(vendor => renderVendorCard(vendor))}
+                      </div>
+                    </Fragment>
                   ))}
+                </div>
+              ) : (
+                /* Flat List View */
+                <div className="divide-y">
+                  {filteredVendors.map(vendor => renderVendorCard(vendor))}
                 </div>
               )}
             </CardContent>
@@ -998,24 +1080,6 @@ export default function VendorsPage() {
               ) : null}
             </CardContent>
           </Card>
-        )}
-
-        {/* Empty State - No selection on desktop */}
-        {!showDetailPanel && (
-          <div className="hidden lg:flex flex-1 items-center justify-center">
-            <Card className="w-full max-w-md">
-              <CardContent className="py-12 text-center">
-                <Store className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Select a vendor from the list to view their details
-                </p>
-                <Button onClick={handleStartCreate}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Vendor
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
         )}
       </div>
 
