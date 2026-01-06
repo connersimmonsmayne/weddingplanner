@@ -40,6 +40,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -770,7 +778,7 @@ export default function GuestsPage() {
     }
   }
 
-  const showDetailPanel = selectedGuest || isCreating
+  const showDetailPanel = selectedGuest !== null
 
   if (weddingLoading || loading) {
     return (
@@ -1830,16 +1838,16 @@ export default function GuestsPage() {
             <CardHeader className="flex-shrink-0 border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">
-                  {isCreating ? 'New Guest' : (isEditing ? 'Edit Guest' : 'Guest Details')}
+                  {isEditing ? 'Edit Guest' : 'Guest Details'}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {(isEditing || isCreating) ? (
+                  {isEditing ? (
                     <>
                       <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                         Cancel
                       </Button>
                       <Button size="sm" onClick={handleSave} disabled={saving}>
-                        {saving ? 'Saving...' : (isCreating ? 'Add Guest' : 'Save')}
+                        {saving ? 'Saving...' : 'Save'}
                       </Button>
                     </>
                   ) : selectedGuest && (
@@ -1861,8 +1869,8 @@ export default function GuestsPage() {
 
             {/* Detail Content */}
             <CardContent className="flex-1 overflow-y-auto p-6">
-              {(isEditing || isCreating) ? (
-                /* Edit/Create Form */
+              {isEditing ? (
+                /* Edit Form */
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="name">Name *</Label>
@@ -2234,6 +2242,199 @@ export default function GuestsPage() {
         )}
 
       </div>
+
+      {/* Add Guest Modal */}
+      <Dialog open={isCreating} onOpenChange={(open) => !open && setIsCreating(false)}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Add Guest</DialogTitle>
+            <DialogDescription>
+              Add a new guest to your wedding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-name">Name *</Label>
+              <Input
+                id="create-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Guest name"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 py-2">
+              <Switch
+                id="create-is-child"
+                checked={formData.is_child}
+                onCheckedChange={(checked) => setFormData({
+                  ...formData,
+                  is_child: checked,
+                  parent_id: checked ? formData.parent_id : '',
+                  partner_id: checked ? '' : formData.partner_id,
+                })}
+              />
+              <Label htmlFor="create-is-child" className="cursor-pointer flex items-center gap-2">
+                <Baby className="h-4 w-4 text-muted-foreground" />
+                This guest is a child
+              </Label>
+            </div>
+
+            {formData.is_child ? (
+              <div className="space-y-2">
+                <Label htmlFor="create-parent">Parent</Label>
+                <Select
+                  value={formData.parent_id}
+                  onValueChange={(value) => setFormData({ ...formData, parent_id: value })}
+                >
+                  <SelectTrigger id="create-parent">
+                    <SelectValue placeholder="Select parent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getParentOptions(formData.name).map((option) => (
+                      <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="create-partner">Partner</Label>
+                <Select
+                  value={formData.partner_id}
+                  onValueChange={(value) => setFormData({ ...formData, partner_id: value })}
+                >
+                  <SelectTrigger id="create-partner">
+                    <SelectValue placeholder="Select partner (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getPartnerOptions('', formData.name).map((adult) => (
+                      <SelectItem key={adult.id} value={adult.id}>{adult.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-side">Side</Label>
+                <Select
+                  value={formData.group_name || ''}
+                  onValueChange={(value) => setFormData({ ...formData, group_name: value })}
+                >
+                  <SelectTrigger id="create-side">
+                    <SelectValue placeholder="Select side" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sideOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-relationship">Relationship</Label>
+                <Input
+                  id="create-relationship"
+                  value={formData.relationship}
+                  onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
+                  placeholder="e.g., Cousin"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-priority">Priority</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value) => setFormData({ ...formData, priority: value })}
+                >
+                  <SelectTrigger id="create-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITY_OPTIONS.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-rsvp">RSVP Status</Label>
+                <Select
+                  value={formData.rsvp_status}
+                  onValueChange={(value: 'pending' | 'confirmed' | 'declined') =>
+                    setFormData({ ...formData, rsvp_status: value })
+                  }
+                >
+                  <SelectTrigger id="create-rsvp">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RSVP_OPTIONS.map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-plus_one">Plus One</Label>
+              <Input
+                id="create-plus_one"
+                value={formData.plus_one}
+                onChange={(e) => setFormData({ ...formData, plus_one: e.target.value })}
+                placeholder="Plus one name or 'Yes'/'No'"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-address">Address</Label>
+              <Textarea
+                id="create-address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Mailing address"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-dietary">Dietary Restrictions</Label>
+              <Input
+                id="create-dietary"
+                value={formData.dietary_restrictions}
+                onChange={(e) => setFormData({ ...formData, dietary_restrictions: e.target.value })}
+                placeholder="e.g., Vegetarian, Gluten-free"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-notes">Notes</Label>
+              <Textarea
+                id="create-notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Any additional notes"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreating(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Adding...' : 'Add Guest'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

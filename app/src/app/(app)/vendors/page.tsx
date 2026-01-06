@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, Fragment } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
-import { Vendor } from '@/types/database'
+import { Vendor, VendorCategory } from '@/types/database'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,13 +11,24 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -32,25 +43,46 @@ import {
   User,
   FileText,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Settings,
+  MapPin,
+  Calendar,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const VENDOR_CATEGORIES = [
-  'Photography',
-  'Videography',
-  'Catering',
-  'Florist',
-  'Music/DJ',
-  'Cake & Desserts',
-  'Hair & Makeup',
-  'Officiant',
-  'Venue',
-  'Transportation',
-  'Other'
-] as const
-
 const STATUS_OPTIONS = ['researching', 'contacted', 'booked', 'rejected'] as const
+
+const SECTION_ORDER = ['ceremony', 'reception', 'beauty', 'media', 'logistics', 'other'] as const
+const SECTION_LABELS: Record<string, string> = {
+  ceremony: 'Ceremony',
+  reception: 'Reception',
+  beauty: 'Beauty',
+  media: 'Media',
+  logistics: 'Logistics',
+  other: 'Other',
+}
+
+const DEFAULT_ICONS: Record<string, string> = {
+  'Photography': '📷',
+  'Videography': '🎥',
+  'Catering': '🍽️',
+  'Florist': '💐',
+  'Music/DJ': '🎵',
+  'Cake & Desserts': '🎂',
+  'Hair & Makeup': '💄',
+  'Officiant': '💒',
+  'Venue': '🏛️',
+  'Transportation': '🚗',
+  'Other': '📦',
+}
+
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+] as const
 
 interface VendorFormData {
   category: string
@@ -59,6 +91,11 @@ interface VendorFormData {
   phone: string
   email: string
   website: string
+  street_address: string
+  city: string
+  state: string
+  zip_code: string
+  visit_date: string
   quote: string
   package_details: string
   status: 'researching' | 'contacted' | 'booked' | 'rejected'
@@ -67,17 +104,34 @@ interface VendorFormData {
 }
 
 const emptyFormData: VendorFormData = {
-  category: 'Photography',
+  category: '',
   name: '',
   contact_name: '',
   phone: '',
   email: '',
   website: '',
+  street_address: '',
+  city: '',
+  state: '',
+  zip_code: '',
+  visit_date: '',
   quote: '',
   package_details: '',
   status: 'researching',
   rating: null,
   notes: '',
+}
+
+interface NewCategoryData {
+  name: string
+  section: typeof SECTION_ORDER[number]
+  icon: string
+}
+
+const emptyNewCategory: NewCategoryData = {
+  name: '',
+  section: 'other',
+  icon: '📦',
 }
 
 function getStatusBadgeVariant(status: string): 'success' | 'warning' | 'destructive' | 'secondary' {
@@ -89,26 +143,16 @@ function getStatusBadgeVariant(status: string): 'success' | 'warning' | 'destruc
   }
 }
 
-function getCategoryIcon(category: string): string {
-  const icons: Record<string, string> = {
-    'Photography': '📷',
-    'Videography': '🎥',
-    'Catering': '🍽️',
-    'Florist': '💐',
-    'Music/DJ': '🎵',
-    'Cake & Desserts': '🎂',
-    'Hair & Makeup': '💄',
-    'Officiant': '💒',
-    'Venue': '🏛️',
-    'Transportation': '🚗',
-    'Other': '📦'
-  }
-  return icons[category] || '📦'
+function getCategoryIcon(category: string, categories: VendorCategory[]): string {
+  const cat = categories.find(c => c.name === category)
+  if (cat?.icon) return cat.icon
+  return DEFAULT_ICONS[category] || '📦'
 }
 
 export default function VendorsPage() {
   const { wedding, loading: weddingLoading } = useWedding()
   const [vendors, setVendors] = useState<Vendor[]>([])
+  const [categories, setCategories] = useState<VendorCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('all')
@@ -118,31 +162,61 @@ export default function VendorsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState<VendorFormData>(emptyFormData)
   const [saving, setSaving] = useState(false)
+  const [groupByCategory, setGroupByCategory] = useState(true)
+
+  // Category management state
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [newCategory, setNewCategory] = useState<NewCategoryData>(emptyNewCategory)
+  const [savingCategory, setSavingCategory] = useState(false)
+
   const supabase = createClient()
 
   useEffect(() => {
     if (!wedding?.id) return
-    fetchVendors()
+    fetchData()
   }, [wedding?.id])
 
-  const fetchVendors = async () => {
+  const fetchData = async () => {
     if (!wedding?.id) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('vendors')
-      .select('*')
-      .eq('wedding_id', wedding.id)
-      .order('category')
-      .order('name')
 
-    if (error) {
+    const [vendorsResult, categoriesResult] = await Promise.all([
+      supabase
+        .from('vendors')
+        .select('*')
+        .eq('wedding_id', wedding.id)
+        .order('category')
+        .order('name'),
+      supabase
+        .from('vendor_categories')
+        .select('*')
+        .eq('wedding_id', wedding.id)
+        .order('section')
+        .order('name'),
+    ])
+
+    if (vendorsResult.error) {
       toast.error('Failed to load vendors')
-      console.error(error)
+      console.error(vendorsResult.error)
     } else {
-      setVendors(data || [])
+      setVendors(vendorsResult.data || [])
     }
+
+    if (categoriesResult.error) {
+      toast.error('Failed to load categories')
+      console.error(categoriesResult.error)
+    } else {
+      setCategories(categoriesResult.data || [])
+    }
+
     setLoading(false)
   }
+
+  // Group categories by section
+  const categoriesBySection = SECTION_ORDER.reduce((acc, section) => {
+    acc[section] = categories.filter(c => c.section === section)
+    return acc
+  }, {} as Record<string, VendorCategory[]>)
 
   const filteredVendors = vendors.filter(vendor => {
     const matchesSearch = vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -155,6 +229,46 @@ export default function VendorsPage() {
     return matchesSearch && matchesCategory && matchesStatus
   })
 
+  // Group vendors by category for grouped view
+  const groupedVendors = useMemo(() => {
+    const groups: { category: string; section: string; icon: string; vendors: Vendor[] }[] = []
+    const categoryMap = new Map<string, Vendor[]>()
+
+    filteredVendors.forEach(vendor => {
+      if (!categoryMap.has(vendor.category)) {
+        categoryMap.set(vendor.category, [])
+      }
+      categoryMap.get(vendor.category)!.push(vendor)
+    })
+
+    // Sort by section order, then by category name
+    const sortedCategories = Array.from(categoryMap.keys()).sort((a, b) => {
+      const catA = categories.find(c => c.name === a)
+      const catB = categories.find(c => c.name === b)
+      const sectionA = catA?.section || 'other'
+      const sectionB = catB?.section || 'other'
+      const sectionOrderA = SECTION_ORDER.indexOf(sectionA as typeof SECTION_ORDER[number])
+      const sectionOrderB = SECTION_ORDER.indexOf(sectionB as typeof SECTION_ORDER[number])
+
+      if (sectionOrderA !== sectionOrderB) {
+        return sectionOrderA - sectionOrderB
+      }
+      return a.localeCompare(b)
+    })
+
+    sortedCategories.forEach(categoryName => {
+      const cat = categories.find(c => c.name === categoryName)
+      groups.push({
+        category: categoryName,
+        section: cat?.section || 'other',
+        icon: cat?.icon || DEFAULT_ICONS[categoryName] || '📦',
+        vendors: categoryMap.get(categoryName)!,
+      })
+    })
+
+    return groups
+  }, [filteredVendors, categories])
+
   const handleSelectVendor = (vendor: Vendor) => {
     setSelectedVendor(vendor)
     setIsEditing(false)
@@ -166,6 +280,11 @@ export default function VendorsPage() {
       phone: vendor.phone || '',
       email: vendor.email || '',
       website: vendor.website || '',
+      street_address: vendor.street_address || '',
+      city: vendor.city || '',
+      state: vendor.state || '',
+      zip_code: vendor.zip_code || '',
+      visit_date: vendor.visit_date || '',
       quote: vendor.quote?.toString() || '',
       package_details: vendor.package_details || '',
       status: vendor.status,
@@ -178,9 +297,10 @@ export default function VendorsPage() {
     setSelectedVendor(null)
     setIsEditing(false)
     setIsCreating(true)
+    const defaultCategory = filterCategory !== 'all' ? filterCategory : (categories[0]?.name || '')
     setFormData({
       ...emptyFormData,
-      category: filterCategory !== 'all' ? filterCategory : 'Photography'
+      category: defaultCategory,
     })
   }
 
@@ -201,6 +321,11 @@ export default function VendorsPage() {
         phone: selectedVendor.phone || '',
         email: selectedVendor.email || '',
         website: selectedVendor.website || '',
+        street_address: selectedVendor.street_address || '',
+        city: selectedVendor.city || '',
+        state: selectedVendor.state || '',
+        zip_code: selectedVendor.zip_code || '',
+        visit_date: selectedVendor.visit_date || '',
         quote: selectedVendor.quote?.toString() || '',
         package_details: selectedVendor.package_details || '',
         status: selectedVendor.status,
@@ -222,6 +347,11 @@ export default function VendorsPage() {
       return
     }
 
+    if (!formData.category) {
+      toast.error('Please select a category')
+      return
+    }
+
     setSaving(true)
 
     const vendorData = {
@@ -231,6 +361,11 @@ export default function VendorsPage() {
       phone: formData.phone || null,
       email: formData.email || null,
       website: formData.website || null,
+      street_address: formData.street_address || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      zip_code: formData.zip_code || null,
+      visit_date: formData.visit_date || null,
       quote: formData.quote ? parseFloat(formData.quote) : null,
       package_details: formData.package_details || null,
       status: formData.status,
@@ -314,6 +449,74 @@ export default function VendorsPage() {
     }
   }
 
+  // Category management functions
+  const handleAddCategory = async () => {
+    if (!wedding?.id || !newCategory.name.trim()) {
+      toast.error('Category name is required')
+      return
+    }
+
+    // Check if category already exists
+    if (categories.some(c => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
+      toast.error('A category with this name already exists')
+      return
+    }
+
+    setSavingCategory(true)
+
+    const { data, error } = await supabase
+      .from('vendor_categories')
+      .insert({
+        wedding_id: wedding.id,
+        name: newCategory.name,
+        section: newCategory.section,
+        icon: newCategory.icon,
+        is_default: false,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      toast.error('Failed to add category')
+      console.error(error)
+    } else {
+      setCategories([...categories, data])
+      setNewCategory(emptyNewCategory)
+      toast.success('Category added')
+    }
+
+    setSavingCategory(false)
+  }
+
+  const handleDeleteCategory = async (category: VendorCategory) => {
+    if (category.is_default) {
+      toast.error('Cannot delete default categories')
+      return
+    }
+
+    // Check if any vendors use this category
+    const vendorsWithCategory = vendors.filter(v => v.category === category.name)
+    if (vendorsWithCategory.length > 0) {
+      toast.error(`Cannot delete: ${vendorsWithCategory.length} vendor(s) use this category`)
+      return
+    }
+
+    if (!confirm(`Delete category "${category.name}"?`)) return
+
+    const { error } = await supabase
+      .from('vendor_categories')
+      .delete()
+      .eq('id', category.id)
+
+    if (error) {
+      toast.error('Failed to delete category')
+      console.error(error)
+    } else {
+      setCategories(categories.filter(c => c.id !== category.id))
+      toast.success('Category deleted')
+    }
+  }
+
   if (weddingLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -336,7 +539,65 @@ export default function VendorsPage() {
     researching: vendors.filter(v => v.status === 'researching').length,
   }
 
-  const showDetailPanel = selectedVendor || isCreating
+  const showDetailPanel = selectedVendor !== null
+
+  // Render grouped category select options
+  const renderCategoryOptions = () => {
+    return SECTION_ORDER.map(section => {
+      const sectionCategories = categoriesBySection[section]
+      if (sectionCategories.length === 0) return null
+
+      return (
+        <SelectGroup key={section}>
+          <SelectLabel className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+            {SECTION_LABELS[section]}
+          </SelectLabel>
+          {sectionCategories.map(cat => (
+            <SelectItem key={cat.id} value={cat.name}>
+              <span className="mr-2">{cat.icon || '📦'}</span>
+              {cat.name}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      )
+    })
+  }
+
+  // Render vendor card - compact layout
+  const renderVendorCard = (vendor: Vendor) => (
+    <button
+      key={vendor.id}
+      onClick={() => handleSelectVendor(vendor)}
+      className={cn(
+        "w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors",
+        selectedVendor?.id === vendor.id && "bg-primary/5"
+      )}
+    >
+      {/* Category Icon */}
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-sm">
+        {getCategoryIcon(vendor.category, categories)}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{vendor.name}</div>
+        <div className="text-xs text-muted-foreground truncate">
+          {!groupByCategory && vendor.category}
+          {!groupByCategory && vendor.quote && ' • '}
+          {vendor.quote && `$${vendor.quote.toLocaleString()}`}
+          {vendor.visit_date && ` • ${new Date(vendor.visit_date).toLocaleDateString()}`}
+        </div>
+      </div>
+
+      {/* Status Badge */}
+      <Badge
+        variant={getStatusBadgeVariant(vendor.status)}
+        className="capitalize flex-shrink-0 text-xs"
+      >
+        {vendor.status}
+      </Badge>
+    </button>
+  )
 
   return (
     <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col">
@@ -353,10 +614,10 @@ export default function VendorsPage() {
       </PageHeader>
 
       {/* Main Content - List + Detail Layout */}
-      <div className="flex-1 flex gap-6 min-h-0">
+      <div className="flex-1 flex gap-6 min-h-0 overflow-hidden min-w-0">
         {/* Vendor List Panel */}
         <div className={cn(
-          "flex flex-col min-h-0",
+          "flex flex-col min-h-0 overflow-hidden min-w-0",
           showDetailPanel ? "hidden lg:flex lg:w-[360px]" : "flex-1"
         )}>
           {/* Search & Filters */}
@@ -377,9 +638,7 @@ export default function VendorsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {VENDOR_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
+                  {renderCategoryOptions()}
                 </SelectContent>
               </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -393,6 +652,29 @@ export default function VendorsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowCategoryModal(true)}
+                title="Manage Categories"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="group-by-category"
+                  checked={groupByCategory}
+                  onCheckedChange={setGroupByCategory}
+                />
+                <Label htmlFor="group-by-category" className="text-sm text-muted-foreground cursor-pointer">
+                  Group by category
+                </Label>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredVendors.length} of {vendors.length} vendors
+              </div>
             </div>
           </div>
 
@@ -412,40 +694,30 @@ export default function VendorsPage() {
                     </Button>
                   )}
                 </div>
-              ) : (
+              ) : groupByCategory ? (
+                /* Grouped View */
                 <div className="divide-y">
-                  {filteredVendors.map((vendor) => (
-                    <button
-                      key={vendor.id}
-                      onClick={() => handleSelectVendor(vendor)}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors",
-                        selectedVendor?.id === vendor.id && "bg-primary/5"
-                      )}
-                    >
-                      {/* Category Icon */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">
-                        {getCategoryIcon(vendor.category)}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{vendor.name}</div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {vendor.category}
-                          {vendor.quote && ` • $${vendor.quote.toLocaleString()}`}
+                  {groupedVendors.map(({ category, icon, vendors: categoryVendors }) => (
+                    <Fragment key={category}>
+                      {/* Category Header */}
+                      <div className="bg-muted/80 px-4 py-2 sticky top-0">
+                        <div className="flex items-center gap-2">
+                          <span>{icon}</span>
+                          <span className="font-semibold text-sm">{category}</span>
+                          <span className="text-muted-foreground text-sm">({categoryVendors.length})</span>
                         </div>
                       </div>
-
-                      {/* Status Badge */}
-                      <Badge
-                        variant={getStatusBadgeVariant(vendor.status)}
-                        className="capitalize flex-shrink-0"
-                      >
-                        {vendor.status}
-                      </Badge>
-                    </button>
+                      {/* Category Vendors */}
+                      <div className="divide-y border-l-2 border-l-primary/30 bg-muted/30">
+                        {categoryVendors.map(vendor => renderVendorCard(vendor))}
+                      </div>
+                    </Fragment>
                   ))}
+                </div>
+              ) : (
+                /* Flat List View */
+                <div className="divide-y">
+                  {filteredVendors.map(vendor => renderVendorCard(vendor))}
                 </div>
               )}
             </CardContent>
@@ -459,10 +731,10 @@ export default function VendorsPage() {
             <CardHeader className="flex-shrink-0 border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">
-                  {isCreating ? 'New Vendor' : (isEditing ? 'Edit Vendor' : 'Vendor Details')}
+                  {isEditing ? 'Edit Vendor' : 'Vendor Details'}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {!isCreating && !isEditing && selectedVendor && (
+                  {!isEditing && selectedVendor && (
                     <>
                       <Button variant="outline" size="sm" onClick={handleStartEdit}>
                         Edit
@@ -481,8 +753,8 @@ export default function VendorsPage() {
 
             {/* Detail Content */}
             <CardContent className="flex-1 overflow-y-auto p-6">
-              {(isEditing || isCreating) ? (
-                /* Edit/Create Form */
+              {isEditing ? (
+                /* Edit Form */
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -492,12 +764,10 @@ export default function VendorsPage() {
                         onValueChange={(value) => setFormData({ ...formData, category: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {VENDOR_CATEGORIES.map((cat) => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                          ))}
+                          {renderCategoryOptions()}
                         </SelectContent>
                       </Select>
                     </div>
@@ -573,7 +843,66 @@ export default function VendorsPage() {
                     />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="street_address">Street Address</Label>
+                    <Input
+                      id="street_address"
+                      value={formData.street_address}
+                      onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
+                      placeholder="123 Main St"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        placeholder="City"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="state">State</Label>
+                        <Select
+                          value={formData.state}
+                          onValueChange={(value) => setFormData({ ...formData, state: value })}
+                        >
+                          <SelectTrigger id="state">
+                            <SelectValue placeholder="State" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {US_STATES.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="zip_code">Zip</Label>
+                        <Input
+                          id="zip_code"
+                          value={formData.zip_code}
+                          onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                          placeholder="12345"
+                          maxLength={10}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="visit_date">Visit Date</Label>
+                      <Input
+                        id="visit_date"
+                        type="date"
+                        value={formData.visit_date}
+                        onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="quote">Quote ($)</Label>
                       <Input
@@ -584,23 +913,24 @@ export default function VendorsPage() {
                         placeholder="2500"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="rating">Rating</Label>
-                      <Select
-                        value={formData.rating?.toString() || 'none'}
-                        onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Rate" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No rating</SelectItem>
-                          {[1, 2, 3, 4, 5].map((r) => (
-                            <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="rating">Rating</Label>
+                    <Select
+                      value={formData.rating?.toString() || 'none'}
+                      onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Rate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No rating</SelectItem>
+                        {[1, 2, 3, 4, 5].map((r) => (
+                          <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -630,7 +960,7 @@ export default function VendorsPage() {
                       Cancel
                     </Button>
                     <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                      {saving ? 'Saving...' : (isCreating ? 'Add Vendor' : 'Save Changes')}
+                      {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
                 </div>
@@ -640,7 +970,7 @@ export default function VendorsPage() {
                   {/* Profile Header */}
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
-                      {getCategoryIcon(selectedVendor.category)}
+                      {getCategoryIcon(selectedVendor.category, categories)}
                     </div>
                     <div>
                       <h2 className="text-xl font-semibold">{selectedVendor.name}</h2>
@@ -693,6 +1023,24 @@ export default function VendorsPage() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Visit Date */}
+                  {selectedVendor.visit_date && (
+                    <div className="flex items-start gap-3">
+                      <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Visit Date</p>
+                        <p className="font-medium">
+                          {new Date(selectedVendor.visit_date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -756,6 +1104,19 @@ export default function VendorsPage() {
                       </div>
                     )}
 
+                    {(selectedVendor.street_address || selectedVendor.city || selectedVendor.state) && (
+                      <div className="flex items-start gap-3">
+                        <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Address</p>
+                          <p className="font-medium">
+                            {selectedVendor.street_address && <span>{selectedVendor.street_address}<br /></span>}
+                            {selectedVendor.city}{selectedVendor.city && selectedVendor.state && ', '}{selectedVendor.state} {selectedVendor.zip_code}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {selectedVendor.package_details && (
                       <div className="flex items-start gap-3">
                         <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -781,25 +1142,339 @@ export default function VendorsPage() {
             </CardContent>
           </Card>
         )}
-
-        {/* Empty State - No selection on desktop */}
-        {!showDetailPanel && (
-          <div className="hidden lg:flex flex-1 items-center justify-center">
-            <Card className="w-full max-w-md">
-              <CardContent className="py-12 text-center">
-                <Store className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Select a vendor from the list to view their details
-                </p>
-                <Button onClick={handleStartCreate}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Vendor
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
+
+      {/* Category Management Modal */}
+      <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Manage Categories</DialogTitle>
+            <DialogDescription>
+              Add custom vendor categories or manage existing ones.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4 space-y-6">
+            {/* Add New Category */}
+            <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+              <h4 className="font-medium text-sm">Add New Category</h4>
+              <div className="grid grid-cols-[1fr_auto] gap-3">
+                <Input
+                  placeholder="Category name"
+                  value={newCategory.name}
+                  onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                />
+                <Input
+                  placeholder="Icon"
+                  value={newCategory.icon}
+                  onChange={(e) => setNewCategory({ ...newCategory, icon: e.target.value })}
+                  className="w-16 text-center"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Select
+                  value={newCategory.section}
+                  onValueChange={(value: typeof SECTION_ORDER[number]) =>
+                    setNewCategory({ ...newCategory, section: value })
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTION_ORDER.map((s) => (
+                      <SelectItem key={s} value={s}>{SECTION_LABELS[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleAddCategory} disabled={savingCategory}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Existing Categories by Section */}
+            <div className="space-y-4">
+              {SECTION_ORDER.map(section => {
+                const sectionCategories = categoriesBySection[section]
+                if (sectionCategories.length === 0) return null
+
+                return (
+                  <div key={section}>
+                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                      {SECTION_LABELS[section]}
+                    </h4>
+                    <div className="space-y-1">
+                      {sectionCategories.map(cat => {
+                        const vendorCount = vendors.filter(v => v.category === cat.name).length
+                        return (
+                          <div
+                            key={cat.id}
+                            className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span>{cat.icon || '📦'}</span>
+                              <span>{cat.name}</span>
+                              {cat.is_default && (
+                                <Badge variant="secondary" className="text-xs">Default</Badge>
+                              )}
+                              {vendorCount > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({vendorCount} vendor{vendorCount !== 1 ? 's' : ''})
+                                </span>
+                              )}
+                            </div>
+                            {!cat.is_default && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => handleDeleteCategory(cat)}
+                                disabled={vendorCount > 0}
+                                title={vendorCount > 0 ? 'Cannot delete: vendors use this category' : 'Delete category'}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Vendor Modal */}
+      <Dialog open={isCreating} onOpenChange={(open) => !open && setIsCreating(false)}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Add Vendor</DialogTitle>
+            <DialogDescription>
+              Add a new vendor to your wedding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-category">Category *</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger id="create-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {renderCategoryOptions()}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: typeof STATUS_OPTIONS[number]) =>
+                    setFormData({ ...formData, status: value })
+                  }
+                >
+                  <SelectTrigger id="create-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-name">Vendor Name *</Label>
+              <Input
+                id="create-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Smith Photography"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-contact">Contact Name</Label>
+                <Input
+                  id="create-contact"
+                  value={formData.contact_name}
+                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                  placeholder="John Smith"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-phone">Phone</Label>
+                <Input
+                  id="create-phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="vendor@example.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-website">Website</Label>
+              <Input
+                id="create-website"
+                value={formData.website}
+                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                placeholder="https://example.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-street_address">Street Address</Label>
+              <Input
+                id="create-street_address"
+                value={formData.street_address}
+                onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
+                placeholder="123 Main St"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-city">City</Label>
+                <Input
+                  id="create-city"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="City"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label htmlFor="create-state">State</Label>
+                  <Select
+                    value={formData.state}
+                    onValueChange={(value) => setFormData({ ...formData, state: value })}
+                  >
+                    <SelectTrigger id="create-state">
+                      <SelectValue placeholder="State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {US_STATES.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-zip_code">Zip</Label>
+                  <Input
+                    id="create-zip_code"
+                    value={formData.zip_code}
+                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                    placeholder="12345"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-visit_date">Visit Date</Label>
+                <Input
+                  id="create-visit_date"
+                  type="date"
+                  value={formData.visit_date}
+                  onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-quote">Quote ($)</Label>
+                <Input
+                  id="create-quote"
+                  type="number"
+                  value={formData.quote}
+                  onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                  placeholder="2500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-rating">Rating</Label>
+              <Select
+                value={formData.rating?.toString() || 'none'}
+                onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
+              >
+                <SelectTrigger id="create-rating">
+                  <SelectValue placeholder="Rate" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No rating</SelectItem>
+                  {[1, 2, 3, 4, 5].map((r) => (
+                    <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-package">Package Details</Label>
+              <Textarea
+                id="create-package"
+                value={formData.package_details}
+                onChange={(e) => setFormData({ ...formData, package_details: e.target.value })}
+                placeholder="What's included in the quote?"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-notes">Notes</Label>
+              <Textarea
+                id="create-notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Any additional notes"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreating(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Adding...' : 'Add Vendor'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
