@@ -203,6 +203,8 @@ export interface Database {
           phone: string | null
           email: string | null
           website: string | null
+          address: string | null
+          visit_date: string | null
           quote: number | null
           package_details: string | null
           status: 'researching' | 'contacted' | 'booked' | 'rejected'
@@ -220,6 +222,8 @@ export interface Database {
           phone?: string | null
           email?: string | null
           website?: string | null
+          address?: string | null
+          visit_date?: string | null
           quote?: number | null
           package_details?: string | null
           status?: 'researching' | 'contacted' | 'booked' | 'rejected'
@@ -237,6 +241,8 @@ export interface Database {
           phone?: string | null
           email?: string | null
           website?: string | null
+          address?: string | null
+          visit_date?: string | null
           quote?: number | null
           package_details?: string | null
           status?: 'researching' | 'contacted' | 'booked' | 'rejected'
@@ -244,6 +250,35 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      vendor_categories: {
+        Row: {
+          id: string
+          wedding_id: string
+          name: string
+          section: 'ceremony' | 'reception' | 'beauty' | 'media' | 'logistics' | 'other'
+          icon: string | null
+          is_default: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          wedding_id: string
+          name: string
+          section: 'ceremony' | 'reception' | 'beauty' | 'media' | 'logistics' | 'other'
+          icon?: string | null
+          is_default?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          wedding_id?: string
+          name?: string
+          section?: 'ceremony' | 'reception' | 'beauty' | 'media' | 'logistics' | 'other'
+          icon?: string | null
+          is_default?: boolean
+          created_at?: string
         }
       }
       tasks: {
@@ -383,6 +418,7 @@ export type Guest = Database['public']['Tables']['guests']['Row']
 export type BudgetCategory = Database['public']['Tables']['budget_categories']['Row']
 export type BudgetExpense = Database['public']['Tables']['budget_expenses']['Row']
 export type Vendor = Database['public']['Tables']['vendors']['Row']
+export type VendorCategory = Database['public']['Tables']['vendor_categories']['Row']
 export type Task = Database['public']['Tables']['tasks']['Row']
 export type TimelineEvent = Database['public']['Tables']['timeline_events']['Row']
 export type WeddingEvent = Database['public']['Tables']['events']['Row']

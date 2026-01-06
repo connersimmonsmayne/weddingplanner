@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
-import { Vendor } from '@/types/database'
+import { Vendor, VendorCategory } from '@/types/database'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,10 +14,20 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -32,25 +42,38 @@ import {
   User,
   FileText,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Settings,
+  MapPin,
+  Calendar,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const VENDOR_CATEGORIES = [
-  'Photography',
-  'Videography',
-  'Catering',
-  'Florist',
-  'Music/DJ',
-  'Cake & Desserts',
-  'Hair & Makeup',
-  'Officiant',
-  'Venue',
-  'Transportation',
-  'Other'
-] as const
-
 const STATUS_OPTIONS = ['researching', 'contacted', 'booked', 'rejected'] as const
+
+const SECTION_ORDER = ['ceremony', 'reception', 'beauty', 'media', 'logistics', 'other'] as const
+const SECTION_LABELS: Record<string, string> = {
+  ceremony: 'Ceremony',
+  reception: 'Reception',
+  beauty: 'Beauty',
+  media: 'Media',
+  logistics: 'Logistics',
+  other: 'Other',
+}
+
+const DEFAULT_ICONS: Record<string, string> = {
+  'Photography': '📷',
+  'Videography': '🎥',
+  'Catering': '🍽️',
+  'Florist': '💐',
+  'Music/DJ': '🎵',
+  'Cake & Desserts': '🎂',
+  'Hair & Makeup': '💄',
+  'Officiant': '💒',
+  'Venue': '🏛️',
+  'Transportation': '🚗',
+  'Other': '📦',
+}
 
 interface VendorFormData {
   category: string
@@ -59,6 +82,8 @@ interface VendorFormData {
   phone: string
   email: string
   website: string
+  address: string
+  visit_date: string
   quote: string
   package_details: string
   status: 'researching' | 'contacted' | 'booked' | 'rejected'
@@ -67,17 +92,31 @@ interface VendorFormData {
 }
 
 const emptyFormData: VendorFormData = {
-  category: 'Photography',
+  category: '',
   name: '',
   contact_name: '',
   phone: '',
   email: '',
   website: '',
+  address: '',
+  visit_date: '',
   quote: '',
   package_details: '',
   status: 'researching',
   rating: null,
   notes: '',
+}
+
+interface NewCategoryData {
+  name: string
+  section: typeof SECTION_ORDER[number]
+  icon: string
+}
+
+const emptyNewCategory: NewCategoryData = {
+  name: '',
+  section: 'other',
+  icon: '📦',
 }
 
 function getStatusBadgeVariant(status: string): 'success' | 'warning' | 'destructive' | 'secondary' {
@@ -89,26 +128,16 @@ function getStatusBadgeVariant(status: string): 'success' | 'warning' | 'destruc
   }
 }
 
-function getCategoryIcon(category: string): string {
-  const icons: Record<string, string> = {
-    'Photography': '📷',
-    'Videography': '🎥',
-    'Catering': '🍽️',
-    'Florist': '💐',
-    'Music/DJ': '🎵',
-    'Cake & Desserts': '🎂',
-    'Hair & Makeup': '💄',
-    'Officiant': '💒',
-    'Venue': '🏛️',
-    'Transportation': '🚗',
-    'Other': '📦'
-  }
-  return icons[category] || '📦'
+function getCategoryIcon(category: string, categories: VendorCategory[]): string {
+  const cat = categories.find(c => c.name === category)
+  if (cat?.icon) return cat.icon
+  return DEFAULT_ICONS[category] || '📦'
 }
 
 export default function VendorsPage() {
   const { wedding, loading: weddingLoading } = useWedding()
   const [vendors, setVendors] = useState<Vendor[]>([])
+  const [categories, setCategories] = useState<VendorCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('all')
@@ -118,31 +147,60 @@ export default function VendorsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState<VendorFormData>(emptyFormData)
   const [saving, setSaving] = useState(false)
+
+  // Category management state
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [newCategory, setNewCategory] = useState<NewCategoryData>(emptyNewCategory)
+  const [savingCategory, setSavingCategory] = useState(false)
+
   const supabase = createClient()
 
   useEffect(() => {
     if (!wedding?.id) return
-    fetchVendors()
+    fetchData()
   }, [wedding?.id])
 
-  const fetchVendors = async () => {
+  const fetchData = async () => {
     if (!wedding?.id) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('vendors')
-      .select('*')
-      .eq('wedding_id', wedding.id)
-      .order('category')
-      .order('name')
 
-    if (error) {
+    const [vendorsResult, categoriesResult] = await Promise.all([
+      supabase
+        .from('vendors')
+        .select('*')
+        .eq('wedding_id', wedding.id)
+        .order('category')
+        .order('name'),
+      supabase
+        .from('vendor_categories')
+        .select('*')
+        .eq('wedding_id', wedding.id)
+        .order('section')
+        .order('name'),
+    ])
+
+    if (vendorsResult.error) {
       toast.error('Failed to load vendors')
-      console.error(error)
+      console.error(vendorsResult.error)
     } else {
-      setVendors(data || [])
+      setVendors(vendorsResult.data || [])
     }
+
+    if (categoriesResult.error) {
+      toast.error('Failed to load categories')
+      console.error(categoriesResult.error)
+    } else {
+      setCategories(categoriesResult.data || [])
+    }
+
     setLoading(false)
   }
+
+  // Group categories by section
+  const categoriesBySection = SECTION_ORDER.reduce((acc, section) => {
+    acc[section] = categories.filter(c => c.section === section)
+    return acc
+  }, {} as Record<string, VendorCategory[]>)
 
   const filteredVendors = vendors.filter(vendor => {
     const matchesSearch = vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -166,6 +224,8 @@ export default function VendorsPage() {
       phone: vendor.phone || '',
       email: vendor.email || '',
       website: vendor.website || '',
+      address: vendor.address || '',
+      visit_date: vendor.visit_date || '',
       quote: vendor.quote?.toString() || '',
       package_details: vendor.package_details || '',
       status: vendor.status,
@@ -178,9 +238,10 @@ export default function VendorsPage() {
     setSelectedVendor(null)
     setIsEditing(false)
     setIsCreating(true)
+    const defaultCategory = filterCategory !== 'all' ? filterCategory : (categories[0]?.name || '')
     setFormData({
       ...emptyFormData,
-      category: filterCategory !== 'all' ? filterCategory : 'Photography'
+      category: defaultCategory,
     })
   }
 
@@ -201,6 +262,8 @@ export default function VendorsPage() {
         phone: selectedVendor.phone || '',
         email: selectedVendor.email || '',
         website: selectedVendor.website || '',
+        address: selectedVendor.address || '',
+        visit_date: selectedVendor.visit_date || '',
         quote: selectedVendor.quote?.toString() || '',
         package_details: selectedVendor.package_details || '',
         status: selectedVendor.status,
@@ -222,6 +285,11 @@ export default function VendorsPage() {
       return
     }
 
+    if (!formData.category) {
+      toast.error('Please select a category')
+      return
+    }
+
     setSaving(true)
 
     const vendorData = {
@@ -231,6 +299,8 @@ export default function VendorsPage() {
       phone: formData.phone || null,
       email: formData.email || null,
       website: formData.website || null,
+      address: formData.address || null,
+      visit_date: formData.visit_date || null,
       quote: formData.quote ? parseFloat(formData.quote) : null,
       package_details: formData.package_details || null,
       status: formData.status,
@@ -314,6 +384,74 @@ export default function VendorsPage() {
     }
   }
 
+  // Category management functions
+  const handleAddCategory = async () => {
+    if (!wedding?.id || !newCategory.name.trim()) {
+      toast.error('Category name is required')
+      return
+    }
+
+    // Check if category already exists
+    if (categories.some(c => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
+      toast.error('A category with this name already exists')
+      return
+    }
+
+    setSavingCategory(true)
+
+    const { data, error } = await supabase
+      .from('vendor_categories')
+      .insert({
+        wedding_id: wedding.id,
+        name: newCategory.name,
+        section: newCategory.section,
+        icon: newCategory.icon,
+        is_default: false,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      toast.error('Failed to add category')
+      console.error(error)
+    } else {
+      setCategories([...categories, data])
+      setNewCategory(emptyNewCategory)
+      toast.success('Category added')
+    }
+
+    setSavingCategory(false)
+  }
+
+  const handleDeleteCategory = async (category: VendorCategory) => {
+    if (category.is_default) {
+      toast.error('Cannot delete default categories')
+      return
+    }
+
+    // Check if any vendors use this category
+    const vendorsWithCategory = vendors.filter(v => v.category === category.name)
+    if (vendorsWithCategory.length > 0) {
+      toast.error(`Cannot delete: ${vendorsWithCategory.length} vendor(s) use this category`)
+      return
+    }
+
+    if (!confirm(`Delete category "${category.name}"?`)) return
+
+    const { error } = await supabase
+      .from('vendor_categories')
+      .delete()
+      .eq('id', category.id)
+
+    if (error) {
+      toast.error('Failed to delete category')
+      console.error(error)
+    } else {
+      setCategories(categories.filter(c => c.id !== category.id))
+      toast.success('Category deleted')
+    }
+  }
+
   if (weddingLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -337,6 +475,28 @@ export default function VendorsPage() {
   }
 
   const showDetailPanel = selectedVendor || isCreating
+
+  // Render grouped category select options
+  const renderCategoryOptions = () => {
+    return SECTION_ORDER.map(section => {
+      const sectionCategories = categoriesBySection[section]
+      if (sectionCategories.length === 0) return null
+
+      return (
+        <SelectGroup key={section}>
+          <SelectLabel className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+            {SECTION_LABELS[section]}
+          </SelectLabel>
+          {sectionCategories.map(cat => (
+            <SelectItem key={cat.id} value={cat.name}>
+              <span className="mr-2">{cat.icon || '📦'}</span>
+              {cat.name}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      )
+    })
+  }
 
   return (
     <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col">
@@ -377,9 +537,7 @@ export default function VendorsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {VENDOR_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
+                  {renderCategoryOptions()}
                 </SelectContent>
               </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -393,6 +551,14 @@ export default function VendorsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowCategoryModal(true)}
+                title="Manage Categories"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
@@ -425,7 +591,7 @@ export default function VendorsPage() {
                     >
                       {/* Category Icon */}
                       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">
-                        {getCategoryIcon(vendor.category)}
+                        {getCategoryIcon(vendor.category, categories)}
                       </div>
 
                       {/* Info */}
@@ -435,6 +601,12 @@ export default function VendorsPage() {
                           {vendor.category}
                           {vendor.quote && ` • $${vendor.quote.toLocaleString()}`}
                         </div>
+                        {vendor.visit_date && (
+                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Calendar className="h-3 w-3" />
+                            Visit: {new Date(vendor.visit_date).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
 
                       {/* Status Badge */}
@@ -492,12 +664,10 @@ export default function VendorsPage() {
                         onValueChange={(value) => setFormData({ ...formData, category: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {VENDOR_CATEGORIES.map((cat) => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                          ))}
+                          {renderCategoryOptions()}
                         </SelectContent>
                       </Select>
                     </div>
@@ -573,7 +743,26 @@ export default function VendorsPage() {
                     />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="123 Main St, City, State 12345"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="visit_date">Visit Date</Label>
+                      <Input
+                        id="visit_date"
+                        type="date"
+                        value={formData.visit_date}
+                        onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="quote">Quote ($)</Label>
                       <Input
@@ -584,23 +773,24 @@ export default function VendorsPage() {
                         placeholder="2500"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="rating">Rating</Label>
-                      <Select
-                        value={formData.rating?.toString() || 'none'}
-                        onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Rate" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No rating</SelectItem>
-                          {[1, 2, 3, 4, 5].map((r) => (
-                            <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="rating">Rating</Label>
+                    <Select
+                      value={formData.rating?.toString() || 'none'}
+                      onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Rate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No rating</SelectItem>
+                        {[1, 2, 3, 4, 5].map((r) => (
+                          <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -640,7 +830,7 @@ export default function VendorsPage() {
                   {/* Profile Header */}
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
-                      {getCategoryIcon(selectedVendor.category)}
+                      {getCategoryIcon(selectedVendor.category, categories)}
                     </div>
                     <div>
                       <h2 className="text-xl font-semibold">{selectedVendor.name}</h2>
@@ -693,6 +883,24 @@ export default function VendorsPage() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Visit Date */}
+                  {selectedVendor.visit_date && (
+                    <div className="flex items-start gap-3">
+                      <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Visit Date</p>
+                        <p className="font-medium">
+                          {new Date(selectedVendor.visit_date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -756,6 +964,16 @@ export default function VendorsPage() {
                       </div>
                     )}
 
+                    {selectedVendor.address && (
+                      <div className="flex items-start gap-3">
+                        <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Address</p>
+                          <p className="font-medium">{selectedVendor.address}</p>
+                        </div>
+                      </div>
+                    )}
+
                     {selectedVendor.package_details && (
                       <div className="flex items-start gap-3">
                         <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -800,6 +1018,116 @@ export default function VendorsPage() {
           </div>
         )}
       </div>
+
+      {/* Category Management Modal */}
+      <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Manage Categories</DialogTitle>
+            <DialogDescription>
+              Add custom vendor categories or manage existing ones.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4 space-y-6">
+            {/* Add New Category */}
+            <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+              <h4 className="font-medium text-sm">Add New Category</h4>
+              <div className="grid grid-cols-[1fr_auto] gap-3">
+                <Input
+                  placeholder="Category name"
+                  value={newCategory.name}
+                  onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                />
+                <Input
+                  placeholder="Icon"
+                  value={newCategory.icon}
+                  onChange={(e) => setNewCategory({ ...newCategory, icon: e.target.value })}
+                  className="w-16 text-center"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Select
+                  value={newCategory.section}
+                  onValueChange={(value: typeof SECTION_ORDER[number]) =>
+                    setNewCategory({ ...newCategory, section: value })
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTION_ORDER.map((s) => (
+                      <SelectItem key={s} value={s}>{SECTION_LABELS[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleAddCategory} disabled={savingCategory}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Existing Categories by Section */}
+            <div className="space-y-4">
+              {SECTION_ORDER.map(section => {
+                const sectionCategories = categoriesBySection[section]
+                if (sectionCategories.length === 0) return null
+
+                return (
+                  <div key={section}>
+                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                      {SECTION_LABELS[section]}
+                    </h4>
+                    <div className="space-y-1">
+                      {sectionCategories.map(cat => {
+                        const vendorCount = vendors.filter(v => v.category === cat.name).length
+                        return (
+                          <div
+                            key={cat.id}
+                            className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span>{cat.icon || '📦'}</span>
+                              <span>{cat.name}</span>
+                              {cat.is_default && (
+                                <Badge variant="secondary" className="text-xs">Default</Badge>
+                              )}
+                              {vendorCount > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({vendorCount} vendor{vendorCount !== 1 ? 's' : ''})
+                                </span>
+                              )}
+                            </div>
+                            {!cat.is_default && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => handleDeleteCategory(cat)}
+                                disabled={vendorCount > 0}
+                                title={vendorCount > 0 ? 'Cannot delete: vendors use this category' : 'Delete category'}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
