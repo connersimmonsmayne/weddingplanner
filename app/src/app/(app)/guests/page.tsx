@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useMemo, Fragment } from 'react'
+import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react'
 import { useWedding } from '@/components/providers/wedding-provider'
 import { createClient } from '@/lib/supabase/client'
 import { Guest } from '@/types/database'
@@ -488,10 +488,10 @@ export default function GuestsPage() {
   }
 
   // Handle address selection - check if partner should also get the address
-  const handleAddressSelect = (addr: AddressResult) => {
+  const handleAddressSelect = useCallback((addr: AddressResult) => {
     // Update form data with address
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       address: addr.fullAddress,
       street_address: addr.streetAddress,
       city: addr.city,
@@ -499,7 +499,7 @@ export default function GuestsPage() {
       zip_code: addr.zipCode,
       latitude: addr.latitude,
       longitude: addr.longitude,
-    })
+    }))
 
     // Check if guest has a partner and ask to apply address to them too
     const partnerId = isEditing ? selectedGuest?.partner_id : formData.partner_id
@@ -514,11 +514,11 @@ export default function GuestsPage() {
         })
       }
     }
-  }
+  }, [isEditing, selectedGuest?.partner_id, formData.partner_id, guests])
 
   // Apply address to partner
-  const handleApplyAddressToPartner = async () => {
-    const { partnerId, address } = partnerAddressDialog
+  const handleApplyAddressToPartner = useCallback(async () => {
+    const { partnerId, address, partnerName } = partnerAddressDialog
     if (!partnerId || !address) return
 
     const { error } = await supabase
@@ -556,11 +556,11 @@ export default function GuestsPage() {
             }
           : g
       ))
-      toast.success(`Address also updated for ${partnerAddressDialog.partnerName}`)
+      toast.success(`Address also updated for ${partnerName}`)
     }
 
     setPartnerAddressDialog({ open: false, partnerName: '', partnerId: '', address: null })
-  }
+  }, [partnerAddressDialog, supabase])
 
   const handleSave = async () => {
     if (!wedding?.id || !formData.name.trim()) {
