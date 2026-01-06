@@ -71,6 +71,7 @@ import {
   LayoutGrid
 } from 'lucide-react'
 import { CSVUploadDialog } from '@/components/ui/csv-upload-dialog'
+import { AddressAutocomplete, AddressResult } from '@/components/ui/address-autocomplete'
 import { cn } from '@/lib/utils'
 
 const RSVP_OPTIONS = ['pending', 'confirmed', 'declined'] as const
@@ -83,6 +84,12 @@ interface GuestFormData {
   priority: string
   plus_one: string
   address: string
+  street_address: string
+  city: string
+  state: string
+  zip_code: string
+  latitude: number | null
+  longitude: number | null
   notes: string
   rsvp_status: 'pending' | 'confirmed' | 'declined'
   dietary_restrictions: string
@@ -98,6 +105,12 @@ const emptyFormData: GuestFormData = {
   priority: 'Must Invite',
   plus_one: '',
   address: '',
+  street_address: '',
+  city: '',
+  state: '',
+  zip_code: '',
+  latitude: null,
+  longitude: null,
   notes: '',
   rsvp_status: 'pending',
   dietary_restrictions: '',
@@ -393,6 +406,12 @@ export default function GuestsPage() {
       priority: guest.priority || 'Must Invite',
       plus_one: guest.plus_one || '',
       address: guest.address || '',
+      street_address: guest.street_address || '',
+      city: guest.city || '',
+      state: guest.state || '',
+      zip_code: guest.zip_code || '',
+      latitude: guest.latitude,
+      longitude: guest.longitude,
       notes: guest.notes || '',
       rsvp_status: guest.rsvp_status,
       dietary_restrictions: guest.dietary_restrictions || '',
@@ -440,6 +459,12 @@ export default function GuestsPage() {
         priority: selectedGuest.priority || 'Must Invite',
         plus_one: selectedGuest.plus_one || '',
         address: selectedGuest.address || '',
+        street_address: selectedGuest.street_address || '',
+        city: selectedGuest.city || '',
+        state: selectedGuest.state || '',
+        zip_code: selectedGuest.zip_code || '',
+        latitude: selectedGuest.latitude,
+        longitude: selectedGuest.longitude,
         notes: selectedGuest.notes || '',
         rsvp_status: selectedGuest.rsvp_status,
         dietary_restrictions: selectedGuest.dietary_restrictions || '',
@@ -464,11 +489,16 @@ export default function GuestsPage() {
 
     setSaving(true)
 
-    // Convert empty IDs to null for database
+    // Convert empty IDs to null for database and set geocoded_at if we have coordinates
     const dataToSave = {
       ...formData,
       parent_id: formData.parent_id || null,
       partner_id: formData.partner_id || null,
+      street_address: formData.street_address || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      zip_code: formData.zip_code || null,
+      geocoded_at: formData.latitude && formData.longitude ? new Date().toISOString() : null,
     }
 
     if (isCreating) {
@@ -2092,14 +2122,26 @@ export default function GuestsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea
-                      id="address"
+                    <Label>Address</Label>
+                    <AddressAutocomplete
                       value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="Mailing address"
-                      rows={2}
+                      onSelect={(addr: AddressResult) => setFormData({
+                        ...formData,
+                        address: addr.fullAddress,
+                        street_address: addr.streetAddress,
+                        city: addr.city,
+                        state: addr.state,
+                        zip_code: addr.zipCode,
+                        latitude: addr.latitude,
+                        longitude: addr.longitude,
+                      })}
+                      placeholder="Start typing an address..."
                     />
+                    {formData.city && (
+                      <p className="text-xs text-muted-foreground">
+                        {formData.street_address && `${formData.street_address}, `}{formData.city}, {formData.state} {formData.zip_code}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -2393,13 +2435,20 @@ export default function GuestsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-address">Address</Label>
-              <Textarea
-                id="create-address"
+              <Label>Address</Label>
+              <AddressAutocomplete
                 value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Mailing address"
-                rows={2}
+                onSelect={(addr: AddressResult) => setFormData({
+                  ...formData,
+                  address: addr.fullAddress,
+                  street_address: addr.streetAddress,
+                  city: addr.city,
+                  state: addr.state,
+                  zip_code: addr.zipCode,
+                  latitude: addr.latitude,
+                  longitude: addr.longitude,
+                })}
+                placeholder="Start typing an address..."
               />
             </div>
 

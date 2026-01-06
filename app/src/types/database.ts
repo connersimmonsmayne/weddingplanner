@@ -83,6 +83,10 @@ export interface Database {
           priority: string | null
           plus_one: string | null
           address: string | null
+          street_address: string | null
+          city: string | null
+          state: string | null
+          zip_code: string | null
           notes: string | null
           rsvp_status: 'pending' | 'confirmed' | 'declined'
           dietary_restrictions: string | null
@@ -104,6 +108,10 @@ export interface Database {
           priority?: string | null
           plus_one?: string | null
           address?: string | null
+          street_address?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
           notes?: string | null
           rsvp_status?: 'pending' | 'confirmed' | 'declined'
           dietary_restrictions?: string | null
@@ -125,6 +133,10 @@ export interface Database {
           priority?: string | null
           plus_one?: string | null
           address?: string | null
+          street_address?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
           notes?: string | null
           rsvp_status?: 'pending' | 'confirmed' | 'declined'
           dietary_restrictions?: string | null
