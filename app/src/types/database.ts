@@ -89,6 +89,9 @@ export interface Database {
           is_child: boolean
           parent_id: string | null
           partner_id: string | null
+          latitude: number | null
+          longitude: number | null
+          geocoded_at: string | null
           created_at: string
           updated_at: string
         }
@@ -107,6 +110,9 @@ export interface Database {
           is_child?: boolean
           parent_id?: string | null
           partner_id?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          geocoded_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -125,6 +131,9 @@ export interface Database {
           is_child?: boolean
           parent_id?: string | null
           partner_id?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          geocoded_at?: string | null
           created_at?: string
           updated_at?: string
         }
