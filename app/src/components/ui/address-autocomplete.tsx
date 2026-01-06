@@ -82,7 +82,7 @@ export function AddressAutocomplete({
     setLoading(true)
     try {
       const response = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lang=en&layer=house,street&bbox=-125,24,-66,50`
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10&lang=en`
       )
 
       if (!response.ok) throw new Error('Search failed')
