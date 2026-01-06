@@ -76,6 +76,14 @@ const DEFAULT_ICONS: Record<string, string> = {
   'Other': '📦',
 }
 
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+] as const
+
 interface VendorFormData {
   category: string
   name: string
@@ -83,7 +91,10 @@ interface VendorFormData {
   phone: string
   email: string
   website: string
-  address: string
+  street_address: string
+  city: string
+  state: string
+  zip_code: string
   visit_date: string
   quote: string
   package_details: string
@@ -99,7 +110,10 @@ const emptyFormData: VendorFormData = {
   phone: '',
   email: '',
   website: '',
-  address: '',
+  street_address: '',
+  city: '',
+  state: '',
+  zip_code: '',
   visit_date: '',
   quote: '',
   package_details: '',
@@ -266,7 +280,10 @@ export default function VendorsPage() {
       phone: vendor.phone || '',
       email: vendor.email || '',
       website: vendor.website || '',
-      address: vendor.address || '',
+      street_address: vendor.street_address || '',
+      city: vendor.city || '',
+      state: vendor.state || '',
+      zip_code: vendor.zip_code || '',
       visit_date: vendor.visit_date || '',
       quote: vendor.quote?.toString() || '',
       package_details: vendor.package_details || '',
@@ -304,7 +321,10 @@ export default function VendorsPage() {
         phone: selectedVendor.phone || '',
         email: selectedVendor.email || '',
         website: selectedVendor.website || '',
-        address: selectedVendor.address || '',
+        street_address: selectedVendor.street_address || '',
+        city: selectedVendor.city || '',
+        state: selectedVendor.state || '',
+        zip_code: selectedVendor.zip_code || '',
         visit_date: selectedVendor.visit_date || '',
         quote: selectedVendor.quote?.toString() || '',
         package_details: selectedVendor.package_details || '',
@@ -341,7 +361,10 @@ export default function VendorsPage() {
       phone: formData.phone || null,
       email: formData.email || null,
       website: formData.website || null,
-      address: formData.address || null,
+      street_address: formData.street_address || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      zip_code: formData.zip_code || null,
       visit_date: formData.visit_date || null,
       quote: formData.quote ? parseFloat(formData.quote) : null,
       package_details: formData.package_details || null,
@@ -540,41 +563,36 @@ export default function VendorsPage() {
     })
   }
 
-  // Render vendor card
+  // Render vendor card - compact layout
   const renderVendorCard = (vendor: Vendor) => (
     <button
       key={vendor.id}
       onClick={() => handleSelectVendor(vendor)}
       className={cn(
-        "w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors",
+        "w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors",
         selectedVendor?.id === vendor.id && "bg-primary/5"
       )}
     >
       {/* Category Icon */}
-      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-sm">
         {getCategoryIcon(vendor.category, categories)}
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{vendor.name}</div>
-        <div className="text-sm text-muted-foreground truncate">
+        <div className="text-sm font-medium truncate">{vendor.name}</div>
+        <div className="text-xs text-muted-foreground truncate">
           {!groupByCategory && vendor.category}
           {!groupByCategory && vendor.quote && ' • '}
           {vendor.quote && `$${vendor.quote.toLocaleString()}`}
+          {vendor.visit_date && ` • ${new Date(vendor.visit_date).toLocaleDateString()}`}
         </div>
-        {vendor.visit_date && (
-          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-            <Calendar className="h-3 w-3" />
-            Visit: {new Date(vendor.visit_date).toLocaleDateString()}
-          </div>
-        )}
       </div>
 
       {/* Status Badge */}
       <Badge
         variant={getStatusBadgeVariant(vendor.status)}
-        className="capitalize flex-shrink-0"
+        className="capitalize flex-shrink-0 text-xs"
       >
         {vendor.status}
       </Badge>
@@ -826,13 +844,53 @@ export default function VendorsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
+                    <Label htmlFor="street_address">Street Address</Label>
                     <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="123 Main St, City, State 12345"
+                      id="street_address"
+                      value={formData.street_address}
+                      onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
+                      placeholder="123 Main St"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        placeholder="City"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="state">State</Label>
+                        <Select
+                          value={formData.state}
+                          onValueChange={(value) => setFormData({ ...formData, state: value })}
+                        >
+                          <SelectTrigger id="state">
+                            <SelectValue placeholder="State" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {US_STATES.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="zip_code">Zip</Label>
+                        <Input
+                          id="zip_code"
+                          value={formData.zip_code}
+                          onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                          placeholder="12345"
+                          maxLength={10}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1046,12 +1104,15 @@ export default function VendorsPage() {
                       </div>
                     )}
 
-                    {selectedVendor.address && (
+                    {(selectedVendor.street_address || selectedVendor.city || selectedVendor.state) && (
                       <div className="flex items-start gap-3">
                         <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
                           <p className="text-sm text-muted-foreground">Address</p>
-                          <p className="font-medium">{selectedVendor.address}</p>
+                          <p className="font-medium">
+                            {selectedVendor.street_address && <span>{selectedVendor.street_address}<br /></span>}
+                            {selectedVendor.city}{selectedVendor.city && selectedVendor.state && ', '}{selectedVendor.state} {selectedVendor.zip_code}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1292,13 +1353,53 @@ export default function VendorsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-address">Address</Label>
+              <Label htmlFor="create-street_address">Street Address</Label>
               <Input
-                id="create-address"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="123 Main St, City, State 12345"
+                id="create-street_address"
+                value={formData.street_address}
+                onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
+                placeholder="123 Main St"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-city">City</Label>
+                <Input
+                  id="create-city"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="City"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label htmlFor="create-state">State</Label>
+                  <Select
+                    value={formData.state}
+                    onValueChange={(value) => setFormData({ ...formData, state: value })}
+                  >
+                    <SelectTrigger id="create-state">
+                      <SelectValue placeholder="State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {US_STATES.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-zip_code">Zip</Label>
+                  <Input
+                    id="create-zip_code"
+                    value={formData.zip_code}
+                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                    placeholder="12345"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -204,6 +204,10 @@ export interface Database {
           email: string | null
           website: string | null
           address: string | null
+          street_address: string | null
+          city: string | null
+          state: string | null
+          zip_code: string | null
           visit_date: string | null
           quote: number | null
           package_details: string | null
@@ -223,6 +227,10 @@ export interface Database {
           email?: string | null
           website?: string | null
           address?: string | null
+          street_address?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
           visit_date?: string | null
           quote?: number | null
           package_details?: string | null
@@ -242,6 +250,10 @@ export interface Database {
           email?: string | null
           website?: string | null
           address?: string | null
+          street_address?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
           visit_date?: string | null
           quote?: number | null
           package_details?: string | null
