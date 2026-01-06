@@ -15,19 +15,16 @@ export interface AddressResult {
   longitude: number
 }
 
-interface PhotonFeature {
-  properties: {
-    name?: string
-    housenumber?: string
-    street?: string
-    city?: string
-    state?: string
-    postcode?: string
-    country?: string
-  }
-  geometry: {
-    coordinates: [number, number] // [lng, lat]
-  }
+interface MapboxFeature {
+  place_name: string
+  center: [number, number] // [lng, lat]
+  context?: Array<{
+    id: string
+    text: string
+    short_code?: string
+  }>
+  address?: string
+  text: string
 }
 
 interface AddressAutocompleteProps {
@@ -72,50 +69,52 @@ export function AddressAutocomplete({
     setInputValue(value)
   }, [value])
 
-  // Search for addresses using Photon API
+  // Search for addresses using Mapbox Geocoding API
   const searchAddresses = useCallback(async (query: string) => {
     if (query.length < 3) {
       setSuggestions([])
       return
     }
 
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+    if (!mapboxToken) {
+      console.error('Mapbox token not configured')
+      return
+    }
+
     setLoading(true)
     try {
       const response = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10&lang=en`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&types=address&country=us&autocomplete=true&limit=5`
       )
 
       if (!response.ok) throw new Error('Search failed')
 
       const data = await response.json()
-      const features: PhotonFeature[] = data.features || []
+      const features: MapboxFeature[] = data.features || []
 
-      const results: AddressResult[] = features
-        .filter(f => f.properties.country === 'United States')
-        .map((feature) => {
-          const props = feature.properties
-          const streetAddress = props.housenumber
-            ? `${props.housenumber} ${props.street || props.name || ''}`
-            : (props.street || props.name || '')
+      const results: AddressResult[] = features.map((feature) => {
+        // Parse context for city, state, zip
+        const context = feature.context || []
+        const city = context.find(c => c.id.startsWith('place'))?.text || ''
+        const state = context.find(c => c.id.startsWith('region'))?.text || ''
+        const zipCode = context.find(c => c.id.startsWith('postcode'))?.text || ''
 
-          const city = props.city || ''
-          const state = props.state || ''
-          const zipCode = props.postcode || ''
+        // Street address is the address number + street name
+        const streetAddress = feature.address
+          ? `${feature.address} ${feature.text}`
+          : feature.text
 
-          const parts = [streetAddress, city, state, zipCode].filter(Boolean)
-          const fullAddress = parts.join(', ')
-
-          return {
-            streetAddress: streetAddress.trim(),
-            city,
-            state,
-            zipCode,
-            fullAddress,
-            latitude: feature.geometry.coordinates[1],
-            longitude: feature.geometry.coordinates[0],
-          }
-        })
-        .filter(r => r.streetAddress && r.city) // Only show results with street and city
+        return {
+          streetAddress,
+          city,
+          state,
+          zipCode,
+          fullAddress: feature.place_name,
+          latitude: feature.center[1],
+          longitude: feature.center[0],
+        }
+      })
 
       setSuggestions(results)
       setIsOpen(results.length > 0)
