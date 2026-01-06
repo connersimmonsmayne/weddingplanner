@@ -172,6 +172,12 @@ export default function GuestsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isAddingPartner, setIsAddingPartner] = useState(false)
   const [newPartnerName, setNewPartnerName] = useState('')
+  const [partnerAddressDialog, setPartnerAddressDialog] = useState<{
+    open: boolean
+    partnerName: string
+    partnerId: string
+    address: AddressResult | null
+  }>({ open: false, partnerName: '', partnerId: '', address: null })
   const supabase = createClient()
 
   useEffect(() => {
@@ -479,6 +485,81 @@ export default function GuestsPage() {
     setSelectedGuest(null)
     setIsEditing(false)
     setIsCreating(false)
+  }
+
+  // Handle address selection - check if partner should also get the address
+  const handleAddressSelect = (addr: AddressResult) => {
+    // Update form data with address
+    setFormData({
+      ...formData,
+      address: addr.fullAddress,
+      street_address: addr.streetAddress,
+      city: addr.city,
+      state: addr.state,
+      zip_code: addr.zipCode,
+      latitude: addr.latitude,
+      longitude: addr.longitude,
+    })
+
+    // Check if guest has a partner and ask to apply address to them too
+    const partnerId = isEditing ? selectedGuest?.partner_id : formData.partner_id
+    if (partnerId) {
+      const partner = guests.find(g => g.id === partnerId)
+      if (partner) {
+        setPartnerAddressDialog({
+          open: true,
+          partnerName: partner.name,
+          partnerId: partner.id,
+          address: addr,
+        })
+      }
+    }
+  }
+
+  // Apply address to partner
+  const handleApplyAddressToPartner = async () => {
+    const { partnerId, address } = partnerAddressDialog
+    if (!partnerId || !address) return
+
+    const { error } = await supabase
+      .from('guests')
+      .update({
+        address: address.fullAddress,
+        street_address: address.streetAddress,
+        city: address.city,
+        state: address.state,
+        zip_code: address.zipCode,
+        latitude: address.latitude,
+        longitude: address.longitude,
+        geocoded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', partnerId)
+
+    if (error) {
+      toast.error('Failed to update partner address')
+      console.error(error)
+    } else {
+      // Update local state
+      setGuests(prev => prev.map(g =>
+        g.id === partnerId
+          ? {
+              ...g,
+              address: address.fullAddress,
+              street_address: address.streetAddress,
+              city: address.city,
+              state: address.state,
+              zip_code: address.zipCode,
+              latitude: address.latitude,
+              longitude: address.longitude,
+              geocoded_at: new Date().toISOString(),
+            }
+          : g
+      ))
+      toast.success(`Address also updated for ${partnerAddressDialog.partnerName}`)
+    }
+
+    setPartnerAddressDialog({ open: false, partnerName: '', partnerId: '', address: null })
   }
 
   const handleSave = async () => {
@@ -2125,16 +2206,7 @@ export default function GuestsPage() {
                     <Label>Address</Label>
                     <AddressAutocomplete
                       value={formData.address}
-                      onSelect={(addr: AddressResult) => setFormData({
-                        ...formData,
-                        address: addr.fullAddress,
-                        street_address: addr.streetAddress,
-                        city: addr.city,
-                        state: addr.state,
-                        zip_code: addr.zipCode,
-                        latitude: addr.latitude,
-                        longitude: addr.longitude,
-                      })}
+                      onSelect={handleAddressSelect}
                       placeholder="Start typing an address..."
                     />
                     {formData.city && (
@@ -2438,16 +2510,7 @@ export default function GuestsPage() {
               <Label>Address</Label>
               <AddressAutocomplete
                 value={formData.address}
-                onSelect={(addr: AddressResult) => setFormData({
-                  ...formData,
-                  address: addr.fullAddress,
-                  street_address: addr.streetAddress,
-                  city: addr.city,
-                  state: addr.state,
-                  zip_code: addr.zipCode,
-                  latitude: addr.latitude,
-                  longitude: addr.longitude,
-                })}
+                onSelect={handleAddressSelect}
                 placeholder="Start typing an address..."
               />
             </div>
@@ -2480,6 +2543,32 @@ export default function GuestsPage() {
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Adding...' : 'Add Guest'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Partner Address Dialog */}
+      <Dialog
+        open={partnerAddressDialog.open}
+        onOpenChange={(open) => !open && setPartnerAddressDialog({ open: false, partnerName: '', partnerId: '', address: null })}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Partner&apos;s Address?</DialogTitle>
+            <DialogDescription>
+              Would you like to set the same address for {partnerAddressDialog.partnerName}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setPartnerAddressDialog({ open: false, partnerName: '', partnerId: '', address: null })}
+            >
+              No, just this guest
+            </Button>
+            <Button onClick={handleApplyAddressToPartner}>
+              Yes, update both
             </Button>
           </DialogFooter>
         </DialogContent>
