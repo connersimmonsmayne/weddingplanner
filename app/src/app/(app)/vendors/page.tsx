@@ -293,11 +293,11 @@ export default function VendorsPage() {
     })
   }
 
-  const handleStartCreate = () => {
+  const handleStartCreate = (prefilledCategory?: string) => {
     setSelectedVendor(null)
     setIsEditing(false)
     setIsCreating(true)
-    const defaultCategory = filterCategory !== 'all' ? filterCategory : (categories[0]?.name || '')
+    const defaultCategory = prefilledCategory || (filterCategory !== 'all' ? filterCategory : (categories[0]?.name || ''))
     setFormData({
       ...emptyFormData,
       category: defaultCategory,
@@ -539,8 +539,6 @@ export default function VendorsPage() {
     researching: vendors.filter(v => v.status === 'researching').length,
   }
 
-  const showDetailPanel = selectedVendor !== null
-
   // Render grouped category select options
   const renderCategoryOptions = () => {
     return SECTION_ORDER.map(section => {
@@ -607,7 +605,7 @@ export default function VendorsPage() {
         count={stats.total}
         countLabel={`vendors • ${stats.booked} booked • ${stats.researching} researching`}
       >
-        <Button size="sm" onClick={handleStartCreate}>
+        <Button size="sm" onClick={() => handleStartCreate()}>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline ml-2">Add Vendor</span>
         </Button>
@@ -616,10 +614,7 @@ export default function VendorsPage() {
       {/* Main Content - List + Detail Layout */}
       <div className="flex-1 flex gap-6 min-h-0 overflow-hidden min-w-0">
         {/* Vendor List Panel */}
-        <div className={cn(
-          "flex flex-col min-h-0 overflow-hidden min-w-0",
-          showDetailPanel ? "hidden lg:flex lg:w-[360px]" : "flex-1"
-        )}>
+        <div className="flex flex-col min-h-0 overflow-hidden min-w-0 flex-1">
           {/* Search & Filters */}
           <div className="space-y-3 mb-4">
             <div className="relative">
@@ -679,469 +674,99 @@ export default function VendorsPage() {
           </div>
 
           {/* Vendor List */}
-          <Card className="flex-1 overflow-hidden">
-            <CardContent className="p-0 h-full overflow-y-auto">
-              {filteredVendors.length === 0 ? (
+          {filteredVendors.length === 0 ? (
+            <Card className="flex-1 overflow-hidden">
+              <CardContent className="p-0 h-full flex items-center justify-center">
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Store className="h-12 w-12 text-muted-foreground/50 mb-3" />
                   <p className="text-muted-foreground">
                     {vendors.length === 0 ? 'No vendors yet' : 'No vendors match your filters'}
                   </p>
                   {vendors.length === 0 && (
-                    <Button variant="outline" className="mt-4" onClick={handleStartCreate}>
+                    <Button variant="outline" className="mt-4" onClick={() => handleStartCreate()}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add your first vendor
                     </Button>
                   )}
                 </div>
-              ) : groupByCategory ? (
-                /* Grouped View */
-                <div className="divide-y">
-                  {groupedVendors.map(({ category, icon, vendors: categoryVendors }) => (
-                    <Fragment key={category}>
-                      {/* Category Header */}
-                      <div className="bg-muted/80 px-4 py-2 sticky top-0">
-                        <div className="flex items-center gap-2">
-                          <span>{icon}</span>
-                          <span className="font-semibold text-sm">{category}</span>
-                          <span className="text-muted-foreground text-sm">({categoryVendors.length})</span>
+              </CardContent>
+            </Card>
+          ) : groupByCategory ? (
+            /* Grid of Category Cards */
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {groupedVendors.map(({ category, icon, vendors: categoryVendors }) => {
+                  const bookedCount = categoryVendors.filter(v => v.status === 'booked').length
+                  return (
+                    <Card key={category}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{icon}</span>
+                            <CardTitle className="text-base">{category}</CardTitle>
+                          </div>
                         </div>
-                      </div>
-                      {/* Category Vendors */}
-                      <div className="divide-y border-l-2 border-l-primary/30 bg-muted/30">
-                        {categoryVendors.map(vendor => renderVendorCard(vendor))}
-                      </div>
-                    </Fragment>
-                  ))}
-                </div>
-              ) : (
-                /* Flat List View */
+                        <p className="text-xs text-muted-foreground">
+                          {categoryVendors.length} vendor{categoryVendors.length !== 1 ? 's' : ''} • {bookedCount} booked
+                        </p>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {categoryVendors.length > 0 ? (
+                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                            {categoryVendors.map(vendor => (
+                              <button
+                                key={vendor.id}
+                                onClick={() => handleSelectVendor(vendor)}
+                                className={cn(
+                                  "w-full flex items-center justify-between gap-2 p-2 rounded-md text-left hover:bg-muted/50 transition-colors",
+                                  selectedVendor?.id === vendor.id && "bg-primary/5"
+                                )}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate">{vendor.name}</div>
+                                  {vendor.quote && (
+                                    <div className="text-xs text-muted-foreground">${vendor.quote.toLocaleString()}</div>
+                                  )}
+                                </div>
+                                <Badge
+                                  variant={getStatusBadgeVariant(vendor.status)}
+                                  className="capitalize text-xs flex-shrink-0"
+                                >
+                                  {vendor.status}
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground py-2">No vendors yet</p>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-3"
+                          onClick={() => handleStartCreate(category)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Vendor
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Flat List View */
+            <Card className="flex-1 overflow-hidden">
+              <CardContent className="p-0 h-full overflow-y-auto">
                 <div className="divide-y">
                   {filteredVendors.map(vendor => renderVendorCard(vendor))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Detail Panel */}
-        {showDetailPanel && (
-          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            {/* Detail Header */}
-            <CardHeader className="flex-shrink-0 border-b">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  {isEditing ? 'Edit Vendor' : 'Vendor Details'}
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  {!isEditing && selectedVendor && (
-                    <>
-                      <Button variant="outline" size="sm" onClick={handleStartEdit}>
-                        Edit
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={handleDelete}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </>
-                  )}
-                  <Button variant="ghost" size="icon-sm" onClick={handleClosePanel}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-
-            {/* Detail Content */}
-            <CardContent className="flex-1 overflow-y-auto p-6">
-              {isEditing ? (
-                /* Edit Form */
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category *</Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => setFormData({ ...formData, category: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {renderCategoryOptions()}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value: typeof STATUS_OPTIONS[number]) =>
-                          setFormData({ ...formData, status: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((s) => (
-                            <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Vendor Name *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Smith Photography"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="contact">Contact Name</Label>
-                      <Input
-                        id="contact"
-                        value={formData.contact_name}
-                        onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                        placeholder="John Smith"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input
-                        id="phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="(555) 123-4567"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="vendor@example.com"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="website">Website</Label>
-                    <Input
-                      id="website"
-                      value={formData.website}
-                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                      placeholder="https://example.com"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="street_address">Street Address</Label>
-                    <Input
-                      id="street_address"
-                      value={formData.street_address}
-                      onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
-                      placeholder="123 Main St"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        placeholder="City"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="state">State</Label>
-                        <Select
-                          value={formData.state}
-                          onValueChange={(value) => setFormData({ ...formData, state: value })}
-                        >
-                          <SelectTrigger id="state">
-                            <SelectValue placeholder="State" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {US_STATES.map((s) => (
-                              <SelectItem key={s} value={s}>{s}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="zip_code">Zip</Label>
-                        <Input
-                          id="zip_code"
-                          value={formData.zip_code}
-                          onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                          placeholder="12345"
-                          maxLength={10}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="visit_date">Visit Date</Label>
-                      <Input
-                        id="visit_date"
-                        type="date"
-                        value={formData.visit_date}
-                        onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="quote">Quote ($)</Label>
-                      <Input
-                        id="quote"
-                        type="number"
-                        value={formData.quote}
-                        onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
-                        placeholder="2500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="rating">Rating</Label>
-                    <Select
-                      value={formData.rating?.toString() || 'none'}
-                      onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Rate" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No rating</SelectItem>
-                        {[1, 2, 3, 4, 5].map((r) => (
-                          <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="package">Package Details</Label>
-                    <Textarea
-                      id="package"
-                      value={formData.package_details}
-                      onChange={(e) => setFormData({ ...formData, package_details: e.target.value })}
-                      placeholder="What's included in the quote?"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Notes</Label>
-                    <Textarea
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="Any additional notes"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <Button variant="outline" className="flex-1" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                    <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                      {saving ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                  </div>
-                </div>
-              ) : selectedVendor ? (
-                /* View Mode */
-                <div className="space-y-6">
-                  {/* Profile Header */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
-                      {getCategoryIcon(selectedVendor.category, categories)}
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold">{selectedVendor.name}</h2>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline">{selectedVendor.category}</Badge>
-                        <Badge
-                          variant={getStatusBadgeVariant(selectedVendor.status)}
-                          className="capitalize"
-                        >
-                          {selectedVendor.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Status Update */}
-                  <div className="p-4 rounded-xl bg-muted/50">
-                    <p className="text-sm text-muted-foreground mb-3">Quick Status Update</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {STATUS_OPTIONS.map((status) => (
-                        <Button
-                          key={status}
-                          variant={selectedVendor.status === status ? 'default' : 'outline'}
-                          size="sm"
-                          className="capitalize"
-                          onClick={() => handleQuickStatus(selectedVendor, status)}
-                        >
-                          {status}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quote & Rating */}
-                  {(selectedVendor.quote || selectedVendor.rating) && (
-                    <div className="flex items-center gap-6">
-                      {selectedVendor.quote && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Quote</p>
-                          <p className="text-2xl font-bold">${selectedVendor.quote.toLocaleString()}</p>
-                        </div>
-                      )}
-                      {selectedVendor.rating && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Rating</p>
-                          <div className="flex items-center gap-1 text-yellow-500">
-                            {Array.from({ length: selectedVendor.rating }).map((_, i) => (
-                              <Star key={i} className="h-5 w-5 fill-current" />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Visit Date */}
-                  {selectedVendor.visit_date && (
-                    <div className="flex items-start gap-3">
-                      <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Visit Date</p>
-                        <p className="font-medium">
-                          {new Date(selectedVendor.visit_date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contact Details */}
-                  <div className="space-y-4">
-                    {selectedVendor.contact_name && (
-                      <div className="flex items-start gap-3">
-                        <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Contact</p>
-                          <p className="font-medium">{selectedVendor.contact_name}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedVendor.phone && (
-                      <div className="flex items-start gap-3">
-                        <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Phone</p>
-                          <a
-                            href={`tel:${selectedVendor.phone}`}
-                            className="font-medium text-primary hover:underline"
-                          >
-                            {selectedVendor.phone}
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedVendor.email && (
-                      <div className="flex items-start gap-3">
-                        <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Email</p>
-                          <a
-                            href={`mailto:${selectedVendor.email}`}
-                            className="font-medium text-primary hover:underline"
-                          >
-                            {selectedVendor.email}
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedVendor.website && (
-                      <div className="flex items-start gap-3">
-                        <Globe className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Website</p>
-                          <a
-                            href={selectedVendor.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium text-primary hover:underline inline-flex items-center gap-1"
-                          >
-                            Visit Website
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {(selectedVendor.street_address || selectedVendor.city || selectedVendor.state) && (
-                      <div className="flex items-start gap-3">
-                        <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Address</p>
-                          <p className="font-medium">
-                            {selectedVendor.street_address && <span>{selectedVendor.street_address}<br /></span>}
-                            {selectedVendor.city}{selectedVendor.city && selectedVendor.state && ', '}{selectedVendor.state} {selectedVendor.zip_code}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedVendor.package_details && (
-                      <div className="flex items-start gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Package Details</p>
-                          <p className="font-medium whitespace-pre-line">{selectedVendor.package_details}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedVendor.notes && (
-                      <div className="flex items-start gap-3">
-                        <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Notes</p>
-                          <p className="font-medium whitespace-pre-line">{selectedVendor.notes}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Category Management Modal */}
@@ -1473,6 +1098,418 @@ export default function VendorsPage() {
               {saving ? 'Adding...' : 'Add Vendor'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vendor Details Modal */}
+      <Dialog open={selectedVendor !== null} onOpenChange={(open) => !open && handleClosePanel()}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle>{isEditing ? 'Edit Vendor' : 'Vendor Details'}</DialogTitle>
+              {!isEditing && selectedVendor && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleStartEdit}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" onClick={handleDelete}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-4">
+            {isEditing ? (
+              /* Edit Form */
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-category">Category *</Label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                    >
+                      <SelectTrigger id="edit-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {renderCategoryOptions()}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value: typeof STATUS_OPTIONS[number]) =>
+                        setFormData({ ...formData, status: value })
+                      }
+                    >
+                      <SelectTrigger id="edit-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Vendor Name *</Label>
+                  <Input
+                    id="edit-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Smith Photography"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-contact">Contact Name</Label>
+                    <Input
+                      id="edit-contact"
+                      value={formData.contact_name}
+                      onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                      placeholder="John Smith"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phone">Phone</Label>
+                    <Input
+                      id="edit-phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="vendor@example.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-website">Website</Label>
+                  <Input
+                    id="edit-website"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-street_address">Street Address</Label>
+                  <Input
+                    id="edit-street_address"
+                    value={formData.street_address}
+                    onChange={(e) => setFormData({ ...formData, street_address: e.target.value })}
+                    placeholder="123 Main St"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-city">City</Label>
+                    <Input
+                      id="edit-city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="City"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-state">State</Label>
+                      <Select
+                        value={formData.state}
+                        onValueChange={(value) => setFormData({ ...formData, state: value })}
+                      >
+                        <SelectTrigger id="edit-state">
+                          <SelectValue placeholder="State" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {US_STATES.map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-zip_code">Zip</Label>
+                      <Input
+                        id="edit-zip_code"
+                        value={formData.zip_code}
+                        onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                        placeholder="12345"
+                        maxLength={10}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-visit_date">Visit Date</Label>
+                    <Input
+                      id="edit-visit_date"
+                      type="date"
+                      value={formData.visit_date}
+                      onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-quote">Quote ($)</Label>
+                    <Input
+                      id="edit-quote"
+                      type="number"
+                      value={formData.quote}
+                      onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                      placeholder="2500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-rating">Rating</Label>
+                  <Select
+                    value={formData.rating?.toString() || 'none'}
+                    onValueChange={(value) => setFormData({ ...formData, rating: value === 'none' ? null : parseInt(value) })}
+                  >
+                    <SelectTrigger id="edit-rating">
+                      <SelectValue placeholder="Rate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No rating</SelectItem>
+                      {[1, 2, 3, 4, 5].map((r) => (
+                        <SelectItem key={r} value={r.toString()}>{'★'.repeat(r)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-package">Package Details</Label>
+                  <Textarea
+                    id="edit-package"
+                    value={formData.package_details}
+                    onChange={(e) => setFormData({ ...formData, package_details: e.target.value })}
+                    placeholder="What's included in the quote?"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <Textarea
+                    id="edit-notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Any additional notes"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            ) : selectedVendor ? (
+              /* View Mode */
+              <div className="space-y-5">
+                {/* Profile Header */}
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
+                    {getCategoryIcon(selectedVendor.category, categories)}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">{selectedVendor.name}</h2>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">{selectedVendor.category}</Badge>
+                      <Badge
+                        variant={getStatusBadgeVariant(selectedVendor.status)}
+                        className="capitalize text-xs"
+                      >
+                        {selectedVendor.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Status Update */}
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-2">Quick Status Update</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {STATUS_OPTIONS.map((status) => (
+                      <Button
+                        key={status}
+                        variant={selectedVendor.status === status ? 'default' : 'outline'}
+                        size="sm"
+                        className="capitalize text-xs h-7"
+                        onClick={() => handleQuickStatus(selectedVendor, status)}
+                      >
+                        {status}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quote & Rating */}
+                {(selectedVendor.quote || selectedVendor.rating) && (
+                  <div className="flex items-center gap-6">
+                    {selectedVendor.quote && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Quote</p>
+                        <p className="text-xl font-bold">${selectedVendor.quote.toLocaleString()}</p>
+                      </div>
+                    )}
+                    {selectedVendor.rating && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Rating</p>
+                        <div className="flex items-center gap-0.5 text-yellow-500">
+                          {Array.from({ length: selectedVendor.rating }).map((_, i) => (
+                            <Star key={i} className="h-4 w-4 fill-current" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Visit Date */}
+                {selectedVendor.visit_date && (
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Visit Date</p>
+                      <p className="text-sm font-medium">
+                        {new Date(selectedVendor.visit_date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contact Details */}
+                <div className="space-y-3">
+                  {selectedVendor.contact_name && (
+                    <div className="flex items-start gap-3">
+                      <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Contact</p>
+                        <p className="text-sm font-medium">{selectedVendor.contact_name}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVendor.phone && (
+                    <div className="flex items-start gap-3">
+                      <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <a
+                          href={`tel:${selectedVendor.phone}`}
+                          className="text-sm font-medium text-primary hover:underline"
+                        >
+                          {selectedVendor.phone}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVendor.email && (
+                    <div className="flex items-start gap-3">
+                      <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <a
+                          href={`mailto:${selectedVendor.email}`}
+                          className="text-sm font-medium text-primary hover:underline"
+                        >
+                          {selectedVendor.email}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVendor.website && (
+                    <div className="flex items-start gap-3">
+                      <Globe className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Website</p>
+                        <a
+                          href={selectedVendor.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          Visit Website
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedVendor.street_address || selectedVendor.city || selectedVendor.state) && (
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Address</p>
+                        <p className="text-sm font-medium">
+                          {selectedVendor.street_address && <span>{selectedVendor.street_address}<br /></span>}
+                          {selectedVendor.city}{selectedVendor.city && selectedVendor.state && ', '}{selectedVendor.state} {selectedVendor.zip_code}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVendor.package_details && (
+                    <div className="flex items-start gap-3">
+                      <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Package Details</p>
+                        <p className="text-sm font-medium whitespace-pre-line">{selectedVendor.package_details}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVendor.notes && (
+                    <div className="flex items-start gap-3">
+                      <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Notes</p>
+                        <p className="text-sm font-medium whitespace-pre-line">{selectedVendor.notes}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {isEditing && (
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>
